@@ -2,6 +2,7 @@ import type { IconProps } from "@phosphor-icons/react";
 import {
   BrainIcon,
   BugIcon,
+  ChartLineIcon,
   GithubLogoIcon,
   KanbanIcon,
   LifebuoyIcon,
@@ -33,6 +34,11 @@ export const SOURCE_PRODUCT_META: Record<
     Icon: BrainIcon,
     color: "var(--purple-9)",
     label: "LLM analytics",
+  },
+  datadog: {
+    Icon: ChartLineIcon,
+    color: "var(--violet-9)",
+    label: "Datadog",
   },
   github: {
     Icon: GithubLogoIcon,

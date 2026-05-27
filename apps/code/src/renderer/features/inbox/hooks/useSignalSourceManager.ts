@@ -27,6 +27,7 @@ const SOURCE_TYPE_MAP: Record<
   SourceType
 > = {
   session_replay: "session_analysis_cluster",
+  datadog: "monitor_alert",
   github: "issue",
   linear: "issue",
   zendesk: "ticket",
@@ -43,6 +44,7 @@ const ERROR_TRACKING_SOURCE_TYPES: SourceType[] = [
 const SOURCE_LABELS: Record<keyof SignalSourceValues, string> = {
   session_replay: "Session replay",
   error_tracking: "Error tracking",
+  datadog: "Datadog",
   github: "GitHub Issues",
   linear: "Linear Issues",
   zendesk: "Zendesk Tickets",
@@ -63,6 +65,7 @@ const DATA_WAREHOUSE_SOURCES: Record<
 const ALL_SOURCE_PRODUCTS: (keyof SignalSourceValues)[] = [
   "session_replay",
   "error_tracking",
+  "datadog",
   "github",
   "linear",
   "zendesk",
@@ -76,6 +79,7 @@ function computeValues(
   const result: SignalSourceValues = {
     session_replay: false,
     error_tracking: false,
+    datadog: false,
     github: false,
     linear: false,
     zendesk: false,

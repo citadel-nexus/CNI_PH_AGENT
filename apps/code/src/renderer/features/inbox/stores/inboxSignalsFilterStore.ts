@@ -16,6 +16,7 @@ export type SourceProduct =
   | "session_replay"
   | "error_tracking"
   | "llm_analytics"
+  | "datadog"
   | "github"
   | "linear"
   | "zendesk"

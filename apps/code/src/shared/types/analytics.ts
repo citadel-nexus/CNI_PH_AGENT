@@ -535,6 +535,12 @@ export interface InboxReportScrolledProperties {
   time_since_open_ms: number;
 }
 
+export interface SignalSourceToggledProperties {
+  source_product: string;
+  enabled: boolean;
+  requires_setup: boolean;
+}
+
 export interface SpendAnalysisTaskOpenedProperties {
   /** Total LLM spend in USD across all products for the analysed window. */
   total_cost_usd: number;
@@ -696,6 +702,7 @@ export const ANALYTICS_EVENTS = {
   INBOX_REPORT_CLOSED: "Inbox report closed",
   INBOX_REPORT_ACTION: "Inbox report action",
   INBOX_REPORT_SCROLLED: "Inbox report scrolled",
+  SIGNAL_SOURCE_TOGGLED: "Signal source toggled",
 
   // Spend analysis events
   SPEND_ANALYSIS_TASK_OPENED: "Spend analysis task opened",
@@ -811,6 +818,7 @@ export type EventPropertyMap = {
   [ANALYTICS_EVENTS.INBOX_REPORT_CLOSED]: InboxReportClosedProperties;
   [ANALYTICS_EVENTS.INBOX_REPORT_ACTION]: InboxReportActionProperties;
   [ANALYTICS_EVENTS.INBOX_REPORT_SCROLLED]: InboxReportScrolledProperties;
+  [ANALYTICS_EVENTS.SIGNAL_SOURCE_TOGGLED]: SignalSourceToggledProperties;
 
   // Spend analysis events
   [ANALYTICS_EVENTS.SPEND_ANALYSIS_TASK_OPENED]: SpendAnalysisTaskOpenedProperties;
