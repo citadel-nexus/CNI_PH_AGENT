@@ -5,7 +5,7 @@ import { ANALYTICS_EVENTS } from "@shared/types/analytics";
 import { track } from "@utils/analytics";
 import { useCallback, useEffect, useState } from "react";
 
-const MAX_INSTRUCTIONS_LENGTH = 2000;
+const MAX_INSTRUCTIONS_LENGTH = 10000;
 
 export function PersonalizationSettings() {
   const customInstructions = useSettingsStore((s) => s.customInstructions);
@@ -57,7 +57,7 @@ export function PersonalizationSettings() {
         onBlur={handleInstructionsBlur}
         maxLength={MAX_INSTRUCTIONS_LENGTH}
         placeholder="e.g. Always write tests for new code. Prefer functional patterns."
-        rows={6}
+        rows={10}
         size="1"
         className="w-full"
       />
