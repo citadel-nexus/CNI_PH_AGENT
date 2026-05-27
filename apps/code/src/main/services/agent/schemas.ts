@@ -47,7 +47,7 @@ export const startSessionInput = z.object({
   runMode: z.enum(["local", "cloud"]).optional(),
   adapter: z.enum(["claude", "codex"]).optional(),
   additionalDirectories: z.array(z.string()).optional(),
-  customInstructions: z.string().max(2000).optional(),
+  customInstructions: z.string().max(10000).optional(),
   effort: effortLevelSchema.optional(),
   model: z.string().optional(),
   jsonSchema: z.record(z.string(), z.unknown()).nullish(),
@@ -172,7 +172,7 @@ export const reconnectSessionInput = z.object({
   /** Additional directories Claude can access beyond cwd (for worktree support) */
   additionalDirectories: z.array(z.string()).optional(),
   permissionMode: z.string().optional(),
-  customInstructions: z.string().max(2000).optional(),
+  customInstructions: z.string().max(10000).optional(),
   effort: effortLevelSchema.optional(),
   jsonSchema: z.record(z.string(), z.unknown()).nullish(),
 });

@@ -95,6 +95,7 @@ export interface SignalSourceConfig {
   source_product:
     | "session_replay"
     | "llm_analytics"
+    | "datadog"
     | "github"
     | "linear"
     | "zendesk"
@@ -107,6 +108,8 @@ export interface SignalSourceConfig {
     | "evaluation"
     | "issue"
     | "ticket"
+    | "monitor_alert"
+    | "incident"
     | "issue_created"
     | "issue_reopened"
     | "issue_spiking"
