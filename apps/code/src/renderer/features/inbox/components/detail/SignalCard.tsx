@@ -74,6 +74,12 @@ function signalCardSourceLine(signal: {
   if (source_product === "pganalyze" && source_type === "issue") {
     return "pganalyze · Issue";
   }
+  if (source_product === "datadog" && source_type === "monitor_alert") {
+    return "Datadog · Monitor alert";
+  }
+  if (source_product === "datadog" && source_type === "incident") {
+    return "Datadog · Incident";
+  }
 
   const productLabel = source_product.replace(/_/g, " ");
   const typeLabel = source_type.replace(/_/g, " ");
@@ -97,6 +103,14 @@ interface GitHubIssueExtra {
 interface ZendeskTicketExtra {
   url?: string;
   priority?: string;
+  status?: string;
+  tags?: string[];
+}
+
+interface DatadogExtra {
+  url?: string;
+  monitor_name?: string;
+  severity?: string;
   status?: string;
   tags?: string[];
 }
@@ -205,6 +219,12 @@ function isZendeskTicketExtra(
   extra: Record<string, unknown>,
 ): extra is Record<string, unknown> & ZendeskTicketExtra {
   return "url" in extra && "priority" in extra;
+}
+
+function isDatadogExtra(
+  extra: Record<string, unknown>,
+): extra is Record<string, unknown> & DatadogExtra {
+  return typeof extra === "object" && extra !== null;
 }
 
 function isLlmEvalExtra(
@@ -446,6 +466,87 @@ function ZendeskTicketSignalCard({
             className="inline-flex items-center gap-1 text-[11px] text-gray-10 hover:text-gray-12"
           >
             Open
+            <ArrowSquareOutIcon size={12} />
+          </a>
+        )}
+      </Flex>
+      <CodePathsCollapsible paths={codePaths ?? []} />
+      <DataQueriedCollapsible text={dataQueried ?? ""} />
+    </Box>
+  );
+}
+
+function DatadogSignalCard({
+  signal,
+  extra,
+  verified,
+  codePaths,
+  dataQueried,
+}: {
+  signal: Signal;
+  extra: DatadogExtra;
+  verified?: boolean;
+  codePaths?: string[];
+  dataQueried?: string;
+}) {
+  const severityColor =
+    extra.severity === "critical"
+      ? "red"
+      : extra.severity === "warning"
+        ? "orange"
+        : "gray";
+
+  return (
+    <Box className="min-w-0 overflow-hidden rounded-lg border border-gray-6 bg-gray-1 p-3">
+      <SignalCardHeader signal={signal} verified={verified} />
+      <CollapsibleBody body={signal.content} />
+      <Flex
+        align="center"
+        gap="2"
+        wrap="wrap"
+        mt="2"
+        className="text-(--gray-10) text-[11px]"
+      >
+        {extra.monitor_name && (
+          <Text className="font-medium text-(--gray-12) text-[11px]">
+            {extra.monitor_name}
+          </Text>
+        )}
+        {extra.severity && (
+          <Badge
+            variant="soft"
+            color={severityColor}
+            size="1"
+            className="text-[11px]"
+          >
+            Severity: {extra.severity}
+          </Badge>
+        )}
+        {extra.status && (
+          <Badge variant="soft" color="gray" size="1" className="text-[11px]">
+            Status: {extra.status}
+          </Badge>
+        )}
+        {extra.tags?.map((tag) => (
+          <Badge
+            key={tag}
+            variant="soft"
+            color="gray"
+            size="1"
+            className="text-[11px]"
+          >
+            {tag}
+          </Badge>
+        ))}
+        <span className="flex-1" />
+        {extra.url && (
+          <a
+            href={extra.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] text-gray-10 hover:text-gray-12"
+          >
+            View in Datadog
             <ArrowSquareOutIcon size={12} />
           </a>
         )}
@@ -908,6 +1009,16 @@ export function SignalCard({
   ) {
     content = (
       <ZendeskTicketSignalCard
+        signal={signal}
+        extra={extra}
+        verified={verified}
+        codePaths={codePaths}
+        dataQueried={dataQueried}
+      />
+    );
+  } else if (signal.source_product === "datadog" && isDatadogExtra(extra)) {
+    content = (
+      <DatadogSignalCard
         signal={signal}
         extra={extra}
         verified={verified}

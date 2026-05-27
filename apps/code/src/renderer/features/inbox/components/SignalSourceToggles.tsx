@@ -4,6 +4,7 @@ import {
   ArrowSquareOutIcon,
   BrainIcon,
   BugIcon,
+  ChartLineIcon,
   ChatsIcon,
   CircleNotchIcon,
   GithubLogoIcon,
@@ -19,6 +20,7 @@ import { memo, useCallback } from "react";
 export interface SignalSourceValues {
   session_replay: boolean;
   error_tracking: boolean;
+  datadog: boolean;
   github: boolean;
   linear: boolean;
   zendesk: boolean;
@@ -298,6 +300,10 @@ export function SignalSourceToggles({
     (checked: boolean) => onToggle("pganalyze", checked),
     [onToggle],
   );
+  const toggleDatadog = useCallback(
+    (checked: boolean) => onToggle("datadog", checked),
+    [onToggle],
+  );
   const setupGithub = useCallback(() => onSetup?.("github"), [onSetup]);
   const setupLinear = useCallback(() => onSetup?.("linear"), [onSetup]);
   const setupZendesk = useCallback(() => onSetup?.("zendesk"), [onSetup]);
@@ -411,6 +417,15 @@ export function SignalSourceToggles({
             loading={sourceStates?.pganalyze?.loading}
             syncStatus={sourceStates?.pganalyze?.syncStatus}
           />
+          <SignalSourceToggleCard
+            icon={<ChartLineIcon size={20} />}
+            label="Datadog"
+            description="Monitor alerts and incidents from Datadog"
+            checked={value.datadog}
+            onCheckedChange={toggleDatadog}
+            disabled={disabled}
+            syncStatus={sourceStates?.datadog?.syncStatus}
+          />
         </Flex>
       </Flex>
     </Flex>
@@ -456,7 +471,7 @@ export function SignalSourceTogglesSkeleton() {
           External connections
         </Text>
         <Flex direction="column" gap="3">
-          {Array.from({ length: 4 }).map((_, index) => (
+          {Array.from({ length: 5 }).map((_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static loading placeholders
             <SignalSourceToggleCardSkeleton key={index} />
           ))}

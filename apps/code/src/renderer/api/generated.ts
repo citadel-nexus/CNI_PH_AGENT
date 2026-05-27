@@ -10789,19 +10789,24 @@ export namespace Schemas {
     previous?: (string | null) | undefined;
     results: Array<SessionRecordingPlaylist>;
   };
+  // NOTE: Manual additions for desktop signal-source support until API schema includes them.
   export type SourceProductEnum =
     | "session_replay"
     | "llm_analytics"
+    | "datadog"
     | "github"
     | "linear"
     | "zendesk"
     | "conversations"
-    | "error_tracking";
+    | "error_tracking"
+    | "pganalyze";
   export type SignalSourceConfigSourceTypeEnum =
     | "session_analysis_cluster"
     | "evaluation"
     | "issue"
     | "ticket"
+    | "monitor_alert"
+    | "incident"
     | "issue_created"
     | "issue_reopened"
     | "issue_spiking";

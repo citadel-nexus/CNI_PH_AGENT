@@ -242,3 +242,28 @@ The plugin configures three MCP servers automatically:
 1. `memory-store` — persistent key-value memory
 2. `datadog` — Datadog API access
 3. `notion` — Notion page read/write
+
+### Integration architecture reference
+
+#### Signal source architecture
+- Signal source contracts are defined in `apps/code/src/renderer/api/posthogClient.ts` and mirrored in `apps/code/src/renderer/api/generated.ts`.
+- Source enablement and config orchestration flows through `apps/code/src/renderer/features/inbox/hooks/useSignalSourceManager.ts`.
+- UI controls live in `apps/code/src/renderer/features/inbox/components/SignalSourceToggles.tsx`.
+- Source-specific rendering flows through `apps/code/src/renderer/features/inbox/components/detail/SignalCard.tsx`.
+
+#### MCP server composition
+- Runtime MCP server composition is handled in `apps/code/src/main/services/agent/auth-adapter.ts`.
+- The final MCP list combines the PostHog-managed server set with installed MCP servers configured from plugin `.mcp.json` entries (Datadog, Notion, memory-store).
+
+#### Plugin skill discovery
+- Skill discovery is implemented in `apps/code/src/main/services/agent/discover-plugins.ts`.
+- The loader only discovers skills that follow the `skills/<name>/SKILL.md` directory contract.
+
+#### CBF runtime trio
+- `cml_blueprints.py` selects and formats blueprint context for planning.
+- `citadel_reflex_engine.py` maps enum/reflex chains and growth outputs.
+- `cbx` CKET builder converts blueprint intent into staged implementation artifacts.
+
+#### Context injection
+- Session prompt assembly lives in `apps/code/src/main/services/agent/service.ts`.
+- `buildSystemPrompt` merges PostHog context with custom instructions before agent session startup.
