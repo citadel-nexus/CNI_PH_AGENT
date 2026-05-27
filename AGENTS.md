@@ -221,23 +221,23 @@ apps/code/src/
 
 The `plugins/citadel/` plugin integrates the Citadel Nexus command center stack:
 
-- **Datadog** - metrics, logs, traces, monitors via MCP
-- **PostHog** - analytics events (bundled via the posthog plugin)
-- **Supabase** - operation tracking and analytics queries
-- **Notion/CBF** - source-of-truth code pages and pull pipeline
-- **Memory Store** - persistent context across sessions
+- **Datadog** — metrics, logs, traces, monitors via MCP
+- **PostHog** — analytics events (bundled via the posthog plugin)
+- **Supabase** — operation tracking and analytics queries
+- **Notion/CBF** — source-of-truth code pages and pull pipeline
+- **Memory Store** — persistent context across sessions
 
 ### Environment variables required
 
-- `DD_API_KEY` - Datadog API key
-- `DD_SITE` - Datadog site (default: us5.datadoghq.com)
-- `NOTION_TOKEN` - Notion integration token
-- `CNWB_ROOT` - CBF workspace root (default: ~/.citadel)
+- `DD_API_KEY` — Datadog API key
+- `DD_SITE` — Datadog site (default: us5.datadoghq.com)
+- `NOTION_TOKEN` — Notion integration token
+- `CNWB_ROOT` — CBF workspace root (default: ~/.citadel)
 
 ### MCP servers
 
 The plugin configures three MCP servers automatically:
 
-1. `memory-store` - persistent key-value memory
-2. `datadog` - Datadog API access
-3. `notion` - Notion page read/write
+1. `memory-store` — persistent key-value memory
+2. `datadog` — Datadog API access
+3. `notion` — Notion page read/write

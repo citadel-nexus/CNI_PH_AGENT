@@ -1,21 +1,22 @@
 ---
 name: memory-store
-description: Persist and retrieve context across coding sessions
+description: Persistent memory across coding sessions via MCP memory-store
 alwaysApply: true
 ---
 
 # Memory Store
 
-Use memory-store to persist meaningful context between sessions.
+Use persistent memory to carry context across sessions and reduce repeated discovery.
 
 ## What to store
 
 1. Investigation findings and root causes
-2. User preferences and recurring conventions
-3. Multi-session task state and pending follow-ups
-4. Stable environment context needed for future work
+2. Important configuration values and topology facts
+3. User preferences and workflow conventions
+4. Multi-session progress and pending actions
 
-## Usage guidance
+## Session workflow
 
-- Check memory early when starting non-trivial work
-- Write back key findings before ending the session
+1. Check memory at session start for relevant prior context.
+2. Update memory whenever a significant finding is confirmed.
+3. Persist final outcomes before ending the session.

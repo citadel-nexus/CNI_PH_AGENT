@@ -6,29 +6,29 @@ alwaysApply: false
 
 # Datadog Telemetry
 
-You have access to Datadog telemetry and operational data for the Citadel Nexus platform.
+Use Datadog telemetry to investigate platform behavior before making code or configuration changes.
 
 ## Available operations
 
-- Metrics: query system and platform metrics
-- Logs: search logs by service, host, env, status, and keywords
-- Traces: inspect distributed trace spans for latency and error analysis
-- Monitors: list monitor status and identify active alerts
-- Events: review deployment, incident, and operational timeline events
+- **Metrics**: Query system and custom metrics for health, throughput, and regressions.
+- **Logs**: Search logs by service, environment, host, and status.
+- **Traces**: Analyze APM traces/spans to find latency and error hotspots.
+- **Monitors**: Check active monitors and alert state to understand impact.
+- **Events**: Review deploy and incident events for timeline correlation.
 
-## Citadel-specific metrics
+## Citadel metrics to prioritize
 
-- `cbf.pull.files_written` - files landed per CBF pull
-- `cbf.pull.collisions` - file conflicts during pulls
-- `cbf.pull.elapsed_ms` - CBF pull duration in milliseconds
-- `cbf.pull.sink.errors` - sink emission failures
-- `cbf.fleet.agents.healthy` - healthy rig agents count
-- `cbf.fleet.cmd.dispatched` - dispatched remote commands
-- `cbf.fleet.cmd.completed` - completed remote commands
+- `cbf.pull.files_written` — files landed per CBF pull (tagged by page and puller version)
+- `cbf.pull.collisions` — file collisions during pulls
+- `cbf.pull.elapsed_ms` — pull duration
+- `cbf.pull.sink.errors` — sink emission failures
+- `cbf.fleet.agents.healthy` — healthy rig agents
+- `cbf.fleet.cmd.dispatched` — commands sent to fleet
+- `cbf.fleet.cmd.completed` — commands completed by fleet
 
-## Suggested workflow
+## Investigation flow
 
-1. Check logs in the affected time window and service scope
-2. Inspect traces for latency outliers or failure paths
-3. Verify monitor state and recent events
-4. Cross-check pull/fleet metrics for deploy and control-plane issues
+1. Check logs for failing service and timeframe.
+2. Check traces for latency spikes or failed spans.
+3. Verify monitor state and related events.
+4. Correlate CBF pull/fleet metrics (`cbf.pull.*`, `cbf.fleet.*`) with observed failures.

@@ -1,12 +1,12 @@
 ---
 name: supabase-analytics
-description: Query Supabase operation tracking and analytics data
+description: Query Supabase for operation tracking and analytics data
 alwaysApply: false
 ---
 
 # Supabase Analytics
 
-Citadel platform operational activity is tracked in Supabase via `operation_track`.
+Use Supabase to inspect operation tracking for automation and telemetry pipelines.
 
 ## operation_track schema (v2)
 
@@ -23,10 +23,13 @@ Citadel platform operational activity is tracked in Supabase via `operation_trac
 - `metadata` (jsonb)
 - `mem_ids` (text[])
 - `fingerprint`
-- `created_at`
+- `created_at` (timestamptz, auto)
 
-## Common query patterns
+## Common queries
 
-- Recent operations: `SELECT * FROM operation_track ORDER BY created_at DESC LIMIT 20`
-- Failed operations: `SELECT * FROM operation_track WHERE outcome = 'error' ORDER BY created_at DESC`
-- Tool usage counts: `SELECT tool, count(*) FROM operation_track GROUP BY tool ORDER BY count(*) DESC`
+- Recent operations:
+  - `SELECT * FROM operation_track ORDER BY created_at DESC LIMIT 20`
+- Failed operations:
+  - `SELECT * FROM operation_track WHERE outcome = 'error' ORDER BY created_at DESC`
+- Operations by tool:
+  - `SELECT tool, count(*) FROM operation_track GROUP BY tool ORDER BY count(*) DESC`
