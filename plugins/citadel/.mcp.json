@@ -1,0 +1,27 @@
+{
+  "memory-store": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic-ai/mcp-memory"],
+    "env": {
+      "MEMORY_STORE_PATH": "~/.citadel/memory-store.json"
+    }
+  },
+  "datadog": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic-ai/mcp-datadog"],
+    "env": {
+      "DD_API_KEY": "${DD_API_KEY}",
+      "DD_SITE": "${DD_SITE:-us5.datadoghq.com}"
+    }
+  },
+  "notion": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic-ai/mcp-notion"],
+    "env": {
+      "NOTION_TOKEN": "${NOTION_TOKEN}"
+    }
+  }
+}
