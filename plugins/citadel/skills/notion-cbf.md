@@ -27,3 +27,20 @@ CBF uses Notion pages as source-of-truth content for file generation and pull op
 - Use search operations to locate source pages by title.
 - Use page read operations to inspect content before editing.
 - Use memory-store to persist findings and pull outcomes across sessions.
+
+## CBF runtime trio (recommended in sequence)
+
+Use these three components together in CBF workflows:
+
+1. `cml_blueprints.py`
+   - Refresh/select relevant Notion blueprint cache context for planning.
+2. `citadel_reflex_engine.py`
+   - Expand domain keywords/professor chains and run reflex growth support.
+3. `cbx` CKET builder flow
+   - Parse blueprint output into staged filesystem artifacts and iterate gaps.
+
+Recommended order for each cycle:
+
+1. planner context (`cml_blueprints`)
+2. reflex/domain expansion (`citadel_reflex_engine`)
+3. staged file materialization + validation (`cbx`)

@@ -226,6 +226,7 @@ The `plugins/citadel/` plugin integrates the Citadel Nexus command center stack:
 - **Supabase** — operation tracking and analytics queries
 - **Notion/CBF** — source-of-truth code pages and pull pipeline
 - **Memory Store** — persistent context across sessions
+- **CBF Runtime Trio** — `cml_blueprints.py` + `citadel_reflex_engine.py` + CKET build flow guidance
 
 ### Environment variables required
 
