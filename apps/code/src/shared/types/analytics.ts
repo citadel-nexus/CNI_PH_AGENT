@@ -61,6 +61,7 @@ export interface TaskCreateProperties {
   has_sandbox_environment?: boolean;
   cloud_run_source?: "manual" | "signal_report";
   cloud_pr_authorship_mode?: "user" | "bot";
+  signal_report_id?: string;
   /** Worktree mode: repo has a non-empty .worktreelink file */
   uses_worktree_link?: boolean;
   /** Worktree mode: repo has a non-empty .worktreeinclude file */
@@ -324,10 +325,11 @@ export type OnboardingStepId =
   | "welcome"
   | "project-select"
   | "invite-code"
-  | "github"
-  | "install-cli";
+  | "connect-github"
+  | "install-cli"
+  | "select-repo";
 
-type OnboardingSkipReason = "tools_not_installed" | "dev_skip";
+type OnboardingSkipReason = "no_repo_selected" | "dev_skip";
 
 export interface OnboardingStepViewedProperties {
   step_id: OnboardingStepId;
@@ -340,6 +342,10 @@ export interface OnboardingStepCompletedProperties {
   step_index: number;
   total_steps: number;
   duration_seconds: number;
+  github_connected?: boolean;
+  git_installed?: boolean;
+  gh_installed?: boolean;
+  gh_authenticated?: boolean;
 }
 
 export interface OnboardingStepSkippedProperties {
@@ -376,7 +382,22 @@ export interface OnboardingCliCheckCompletedProperties {
 export interface OnboardingCompletedProperties {
   duration_seconds: number;
   github_connected: boolean;
-  cli_skipped: boolean;
+  repo_skipped: boolean;
+}
+
+export type OnboardingGithubConnectFlow =
+  | "team_existing"
+  | "team_alternative"
+  | "user_new";
+
+export interface OnboardingGithubConnectStartedProperties {
+  flow_type: OnboardingGithubConnectFlow;
+  is_retry: boolean;
+}
+
+export interface OnboardingGithubConnectFailedProperties {
+  reason: "timeout" | "error";
+  error_type?: string;
 }
 
 export interface OnboardingAbandonedProperties {
@@ -583,7 +604,40 @@ export interface InboxReportActionProperties {
   question_text?: string;
 }
 
+export interface SignalSourceConnectedProperties {
+  source_product:
+    | "session_replay"
+    | "error_tracking"
+    | "github"
+    | "linear"
+    | "zendesk"
+    | "conversations"
+    | "pganalyze"
+    | "llm_analytics";
+  /** True when this is a brand-new createSignalSourceConfig, false for re-enable of an existing config. */
+  is_first_connection: boolean;
+  /** True when the connection went through the DataSourceSetup wizard (warehouse OAuth path). */
+  via_setup_wizard: boolean;
+}
+
 // Subscription / billing events
+
+export type UpgradePromptShownSurface = "usage_limit_modal" | "upgrade_dialog";
+
+export type UpgradePromptClickedSurface =
+  | "usage_limit_modal"
+  | "sidebar"
+  | "plan_page_card"
+  | "upgrade_dialog";
+
+export interface UpgradePromptShownProperties {
+  surface: UpgradePromptShownSurface;
+}
+
+export interface UpgradePromptClickedProperties {
+  surface: UpgradePromptClickedSurface;
+}
+
 export interface SubscriptionStartedProperties {
   plan_key: string;
   previous_plan_key?: string;
@@ -671,6 +725,8 @@ export const ANALYTICS_EVENTS = {
   ONBOARDING_PROJECT_SELECTED: "Onboarding project selected",
   ONBOARDING_INVITE_CODE_SUBMITTED: "Onboarding invite code submitted",
   ONBOARDING_FOLDER_SELECTED: "Onboarding folder selected",
+  ONBOARDING_GITHUB_CONNECT_STARTED: "Onboarding github connect started",
+  ONBOARDING_GITHUB_CONNECT_FAILED: "Onboarding github connect failed",
   ONBOARDING_GITHUB_CONNECTED: "Onboarding github connected",
   ONBOARDING_CLI_CHECK_COMPLETED: "Onboarding cli check completed",
   ONBOARDING_COMPLETED: "Onboarding completed",
@@ -703,6 +759,7 @@ export const ANALYTICS_EVENTS = {
   INBOX_REPORT_ACTION: "Inbox report action",
   INBOX_REPORT_SCROLLED: "Inbox report scrolled",
   SIGNAL_SOURCE_TOGGLED: "Signal source toggled",
+  SIGNAL_SOURCE_CONNECTED: "Signal source connected",
 
   // Spend analysis events
   SPEND_ANALYSIS_TASK_OPENED: "Spend analysis task opened",
@@ -712,6 +769,8 @@ export const ANALYTICS_EVENTS = {
   PROMPT_HISTORY_SELECTED: "Prompt history selected",
 
   // Subscription events
+  UPGRADE_PROMPT_SHOWN: "Upgrade prompt shown",
+  UPGRADE_PROMPT_CLICKED: "Upgrade prompt clicked",
   SUBSCRIPTION_STARTED: "Subscription started",
   SUBSCRIPTION_CANCELLED: "Subscription cancelled",
 } as const;
@@ -787,6 +846,8 @@ export type EventPropertyMap = {
   [ANALYTICS_EVENTS.ONBOARDING_PROJECT_SELECTED]: OnboardingProjectSelectedProperties;
   [ANALYTICS_EVENTS.ONBOARDING_INVITE_CODE_SUBMITTED]: OnboardingInviteCodeSubmittedProperties;
   [ANALYTICS_EVENTS.ONBOARDING_FOLDER_SELECTED]: OnboardingFolderSelectedProperties;
+  [ANALYTICS_EVENTS.ONBOARDING_GITHUB_CONNECT_STARTED]: OnboardingGithubConnectStartedProperties;
+  [ANALYTICS_EVENTS.ONBOARDING_GITHUB_CONNECT_FAILED]: OnboardingGithubConnectFailedProperties;
   [ANALYTICS_EVENTS.ONBOARDING_GITHUB_CONNECTED]: never;
   [ANALYTICS_EVENTS.ONBOARDING_CLI_CHECK_COMPLETED]: OnboardingCliCheckCompletedProperties;
   [ANALYTICS_EVENTS.ONBOARDING_COMPLETED]: OnboardingCompletedProperties;
@@ -819,6 +880,7 @@ export type EventPropertyMap = {
   [ANALYTICS_EVENTS.INBOX_REPORT_ACTION]: InboxReportActionProperties;
   [ANALYTICS_EVENTS.INBOX_REPORT_SCROLLED]: InboxReportScrolledProperties;
   [ANALYTICS_EVENTS.SIGNAL_SOURCE_TOGGLED]: SignalSourceToggledProperties;
+  [ANALYTICS_EVENTS.SIGNAL_SOURCE_CONNECTED]: SignalSourceConnectedProperties;
 
   // Spend analysis events
   [ANALYTICS_EVENTS.SPEND_ANALYSIS_TASK_OPENED]: SpendAnalysisTaskOpenedProperties;
@@ -828,6 +890,8 @@ export type EventPropertyMap = {
   [ANALYTICS_EVENTS.PROMPT_HISTORY_SELECTED]: PromptHistorySelectedProperties;
 
   // Subscription events
+  [ANALYTICS_EVENTS.UPGRADE_PROMPT_SHOWN]: UpgradePromptShownProperties;
+  [ANALYTICS_EVENTS.UPGRADE_PROMPT_CLICKED]: UpgradePromptClickedProperties;
   [ANALYTICS_EVENTS.SUBSCRIPTION_STARTED]: SubscriptionStartedProperties;
   [ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED]: SubscriptionCancelledProperties;
 };
