@@ -34,6 +34,7 @@ import { useTaskSelectionStore } from "../stores/taskSelectionStore";
 import { CommandCenterItem } from "./items/CommandCenterItem";
 import { InboxItem, NewTaskItem } from "./items/HomeItem";
 import { McpServersItem } from "./items/McpServersItem";
+import { OpsDashboardItem } from "./items/OpsDashboardItem";
 import { SearchItem } from "./items/SearchItem";
 import { SkillsItem } from "./items/SkillsItem";
 import { SidebarItem } from "./SidebarItem";
@@ -48,6 +49,7 @@ function SidebarMenuComponent() {
     navigateToCommandCenter,
     navigateToSkills,
     navigateToMcpServers,
+    navigateToOpsDashboard,
   } = useNavigationStore();
 
   // Must mirror useSidebarData's filters so taskMap covers every rendered
@@ -128,6 +130,10 @@ function SidebarMenuComponent() {
 
   const handleMcpServersClick = () => {
     navigateToMcpServers();
+  };
+
+  const handleOpsDashboardClick = () => {
+    navigateToOpsDashboard();
   };
 
   const openCommandMenu = useCommandMenuStore((s) => s.open);
@@ -421,6 +427,13 @@ function SidebarMenuComponent() {
             <McpServersItem
               isActive={sidebarData.isMcpServersActive}
               onClick={handleMcpServersClick}
+            />
+          </Box>
+
+          <Box>
+            <OpsDashboardItem
+              isActive={sidebarData.isOpsDashboardActive}
+              onClick={handleOpsDashboardClick}
             />
           </Box>
 

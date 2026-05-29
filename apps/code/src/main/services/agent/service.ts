@@ -51,6 +51,7 @@ import { MAIN_TOKENS } from "../../di/tokens";
 import { isDevBuild } from "../../utils/env";
 import { logger } from "../../utils/logger";
 import { TypedEventEmitter } from "../../utils/typed-event-emitter";
+import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import type { FsService } from "../fs/service";
 import type { McpAppsService } from "../mcp-apps/service";
 import type { PosthogPluginService } from "../posthog-plugin/service";
@@ -245,6 +246,8 @@ interface ManagedSession {
   configOptions?: SessionConfigOption[];
   /** Tracks in-flight MCP tool calls (toolCallId → toolKey) for cancellation */
   inFlightMcpToolCalls: Map<string, string>;
+  /** Tracks MCP tool call start times for latency metrics */
+  mcpToolCallStartedAt: Map<string, number>;
   /** MCP tool approval states fetched at session start */
   mcpToolApprovals: McpToolApprovals;
   /** Maps tool keys to their installation for backend approval updates */
@@ -297,6 +300,7 @@ export class AgentService extends TypedEventEmitter<AgentServiceEvents> {
   private posthogPluginService: PosthogPluginService;
   private agentAuthAdapter: AgentAuthAdapter;
   private mcpAppsService: McpAppsService;
+  private datadogTelemetry: DatadogTelemetryService;
 
   constructor(
     @inject(MAIN_TOKENS.ProcessTrackingService)
@@ -311,6 +315,8 @@ export class AgentService extends TypedEventEmitter<AgentServiceEvents> {
     agentAuthAdapter: AgentAuthAdapter,
     @inject(MAIN_TOKENS.McpAppsService)
     mcpAppsService: McpAppsService,
+    @inject(MAIN_TOKENS.DatadogTelemetryService)
+    datadogTelemetry: DatadogTelemetryService,
     @inject(MAIN_TOKENS.PowerManager)
     powerManager: IPowerManager,
     @inject(MAIN_TOKENS.BundledResources)
@@ -331,6 +337,7 @@ export class AgentService extends TypedEventEmitter<AgentServiceEvents> {
     this.posthogPluginService = posthogPluginService;
     this.agentAuthAdapter = agentAuthAdapter;
     this.mcpAppsService = mcpAppsService;
+    this.datadogTelemetry = datadogTelemetry;
 
     powerManager.onResume(() => this.checkIdleDeadlines());
   }
@@ -537,28 +544,81 @@ When creating pull requests, add the following footer at the end of the PR descr
   }
 
   async startSession(params: StartSessionInput): Promise<SessionResponse> {
-    this.validateSessionParams(params);
-    const config = this.toSessionConfig(params);
-    const session = await this.getOrCreateSession(config, false);
-    if (!session) {
-      throw new Error("Failed to create session");
+    const tags = {
+      task_id: params.taskId,
+      task_run_id: params.taskRunId,
+      adapter: params.adapter ?? "claude",
+      operation: "start",
+    };
+    const span = this.datadogTelemetry.startSpan("agent.session.start", tags);
+
+    try {
+      this.validateSessionParams(params);
+      const config = this.toSessionConfig(params);
+      const session = await this.getOrCreateSession(config, false);
+      if (!session) {
+        throw new Error("Failed to create session");
+      }
+
+      this.datadogTelemetry.incrementMetric("agent.session.success", tags);
+      return this.toSessionResponse(session);
+    } catch (error) {
+      this.datadogTelemetry.incrementMetric("agent.session.error", tags);
+      void this.datadogTelemetry.trackEvent(
+        "Agent session start failed",
+        error instanceof Error ? error.message : String(error),
+        tags,
+      );
+      throw error;
+    } finally {
+      this.datadogTelemetry.endSpan(span);
     }
-    return this.toSessionResponse(session);
   }
 
   async reconnectSession(
     params: ReconnectSessionInput,
   ): Promise<SessionResponse | null> {
+    const tags = {
+      task_id: params.taskId,
+      task_run_id: params.taskRunId,
+      adapter: params.adapter ?? "claude",
+      operation: "reconnect",
+    };
+    const span = this.datadogTelemetry.startSpan(
+      "agent.session.reconnect",
+      tags,
+    );
+
     try {
       this.validateSessionParams(params);
     } catch (err) {
       log.error("Invalid reconnect params", err);
+      this.datadogTelemetry.incrementMetric("agent.session.error", tags);
+      this.datadogTelemetry.endSpan(span);
       return null;
     }
 
-    const config = this.toSessionConfig(params);
-    const session = await this.getOrCreateSession(config, true);
-    return session ? this.toSessionResponse(session) : null;
+    try {
+      const config = this.toSessionConfig(params);
+      const session = await this.getOrCreateSession(config, true);
+      if (session) {
+        this.datadogTelemetry.incrementMetric("agent.session.success", tags);
+        return this.toSessionResponse(session);
+      }
+
+      this.datadogTelemetry.incrementMetric("agent.session.error", tags);
+      return null;
+    } catch (error) {
+      this.datadogTelemetry.incrementMetric("agent.session.error", tags);
+      void this.datadogTelemetry.trackEvent(
+        "Agent session reconnect failed",
+        error instanceof Error ? error.message : String(error),
+        tags,
+      );
+      throw error;
+    } finally {
+      this.datadogTelemetry.endSpan(span);
+    }
   }
 
   private async getOrCreateSession(
@@ -636,6 +696,15 @@ When creating pull requests, add the following footer at the end of the PR descr
         taskId,
         customInstructions,
         additionalDirectories,
+      );
+      this.datadogTelemetry.gauge(
+        "agent.context_window.token_estimate",
+        this.estimateTokenCount(systemPrompt.append),
+        {
+          task_id: taskId,
+          task_run_id: taskRunId,
+          adapter: adapter ?? "claude",
+        },
       );
 
       const acpConnection = await agent.run(taskId, taskRunId, {
@@ -845,6 +914,7 @@ When creating pull requests, add the following footer at the end of the PR descr
         promptPending: false,
         configOptions,
         inFlightMcpToolCalls: new Map(),
+        mcpToolCallStartedAt: new Map(),
         mcpToolApprovals: toolApprovals,
         toolInstallations,
       };
@@ -857,6 +927,20 @@ When creating pull requests, add the following footer at the end of the PR descr
       }
       return session;
     } catch (err) {
+      const errorTags = {
+        task_id: taskId,
+        task_run_id: taskRunId,
+        adapter: adapter ?? "claude",
+        operation: isReconnect ? "reconnect" : "start",
+        retry: isRetry ? "true" : "false",
+      };
+      this.datadogTelemetry.incrementMetric("agent.session.error", errorTags);
+      void this.datadogTelemetry.trackEvent(
+        "Agent session runtime error",
+        err instanceof Error ? err.message : String(err),
+        errorTags,
+      );
+
       try {
         await agent.cleanup();
       } catch {
@@ -917,6 +1001,14 @@ When creating pull requests, add the following footer at the end of the PR descr
 
     session.lastActivityAt = Date.now();
     session.promptPending = true;
+    this.datadogTelemetry.gauge(
+      "agent.context_window.prompt_tokens_estimate",
+      this.estimatePromptTokens(finalPrompt),
+      {
+        task_id: session.taskId,
+        task_run_id: sessionId,
+      },
+    );
     this.recordActivity(sessionId);
     this.sleepService.acquire(sessionId);
 
@@ -929,6 +1021,21 @@ When creating pull requests, add the following footer at the end of the PR descr
         stopReason: result.stopReason,
         _meta: result._meta as PromptOutput["_meta"],
       };
+    } catch (error) {
+      this.datadogTelemetry.incrementMetric("agent.session.error", {
+        task_id: session.taskId,
+        task_run_id: sessionId,
+        operation: "prompt",
+      });
+      void this.datadogTelemetry.trackEvent(
+        "Agent prompt failed",
+        error instanceof Error ? error.message : String(error),
+        {
+          task_id: session.taskId,
+          task_run_id: sessionId,
+        },
+      );
+      throw error;
     } finally {
       session.promptPending = false;
       session.lastActivityAt = Date.now();
@@ -1213,6 +1320,7 @@ For git operations while detached:
     }
 
     session.inFlightMcpToolCalls.clear();
+    session.mcpToolCallStartedAt.clear();
   }
 
   private async cleanupSession(taskRunId: string): Promise<void> {
@@ -1568,6 +1676,29 @@ For git operations while detached:
     };
   }
 
+  private estimateTokenCount(input: string): number {
+    if (!input.trim()) {
+      return 0;
+    }
+
+    // Lightweight estimate used for trend metrics only.
+    return Math.max(1, Math.ceil(input.length / 4));
+  }
+
+  private estimatePromptTokens(blocks: ContentBlock[]): number {
+    const merged = blocks
+      .map((block) =>
+        typeof block === "object" &&
+        block &&
+        "text" in block &&
+        typeof block.text === "string"
+          ? block.text
+          : "",
+      )
+      .join("\n");
+    return this.estimateTokenCount(merged);
+  }
+
   private handleToolCallUpdate(taskRunId: string, message: unknown): void {
     try {
       const msg = message as {
@@ -1575,6 +1706,8 @@ For git operations while detached:
         params?: {
           update?: {
             sessionUpdate?: string;
+            toolCallId?: string;
+            status?: string;
             _meta?: {
               claudeCode?: {
                 toolName?: string;
@@ -1587,16 +1720,67 @@ For git operations while detached:
         };
       };
 
-      // Only process session/update notifications for tool_call_update
+      // Only process session/update notifications for MCP tool activity
       if (msg.method !== "session/update") return;
-      if (msg.params?.update?.sessionUpdate !== "tool_call_update") return;
 
-      const update = msg.params.update;
+      const update = msg.params?.update;
+      if (!update) return;
+
+      if (
+        update.sessionUpdate !== "tool_call" &&
+        update.sessionUpdate !== "tool_call_update"
+      ) {
+        return;
+      }
+
       const toolMeta = update._meta?.claudeCode;
       const toolName = toolMeta?.toolName;
-      if (!toolName) return;
+      if (!toolName?.startsWith("mcp__")) return;
 
       const session = this.sessions.get(taskRunId);
+      const toolCallId = update.toolCallId;
+
+      if (update.sessionUpdate === "tool_call" && toolCallId) {
+        session?.mcpToolCallStartedAt.set(toolCallId, Date.now());
+        this.datadogTelemetry.incrementMetric("agent.mcp.tool_call.started", {
+          task_run_id: taskRunId,
+          tool_name: toolName,
+        });
+        return;
+      }
+
+      if (
+        update.sessionUpdate === "tool_call_update" &&
+        toolCallId &&
+        (update.status === "completed" || update.status === "failed")
+      ) {
+        const startedAt = session?.mcpToolCallStartedAt.get(toolCallId);
+        if (startedAt) {
+          session?.mcpToolCallStartedAt.delete(toolCallId);
+          this.datadogTelemetry.histogram(
+            "agent.mcp.tool_call.duration_ms",
+            Math.max(Date.now() - startedAt, 0),
+            {
+              task_run_id: taskRunId,
+              tool_name: toolName,
+              status: update.status,
+            },
+          );
+        }
+        this.datadogTelemetry.incrementMetric(
+          update.status === "failed"
+            ? "agent.mcp.tool_call.failed"
+            : "agent.mcp.tool_call.succeeded",
+          {
+            task_run_id: taskRunId,
+            tool_name: toolName,
+          },
+        );
+      }
+
+      if (update.sessionUpdate !== "tool_call_update") {
+        return;
+      }
 
       this.detectAndAttachPrUrl(taskRunId, session, toolMeta, update.content);
 
