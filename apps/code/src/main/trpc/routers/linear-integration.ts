@@ -4,6 +4,8 @@ import {
   linearActiveIssuesOutput,
   linearProjectStatusOutput,
   linearRecentUpdatesOutput,
+  getActiveIssuesOutput,
+  getProjectStatusOutput,
   startLinearFlowInput,
   startLinearFlowOutput,
 } from "../../services/linear-integration/schemas.js";
@@ -29,4 +31,10 @@ export const linearIntegrationRouter = router({
   getRecentUpdates: publicProcedure
     .output(linearRecentUpdatesOutput)
     .query(() => getService().getRecentUpdates()),
+    .output(getActiveIssuesOutput)
+    .query(() => getService().getActiveIssues()),
+  getProjectStatus: publicProcedure
+    .output(getProjectStatusOutput)
+    .query(() => getService().getProjectStatus()),
 });
+

@@ -11,6 +11,7 @@ import {
   telemetryOperationOutput,
   trackEventInput,
 } from "../../services/datadog-telemetry/schemas";
+import { telemetryStatsOutput } from "../../services/datadog-telemetry/schemas";
 import type { DatadogTelemetryService } from "../../services/datadog-telemetry/service";
 import { publicProcedure, router } from "../trpc";
 
@@ -66,4 +67,7 @@ export const datadogTelemetryRouter = router({
   getDashboardStatus: publicProcedure
     .output(datadogDashboardStatusOutput)
     .query(() => getService().getDashboardStatus()),
+  getStats: publicProcedure
+    .output(telemetryStatsOutput)
+    .query(() => getService().getStats()),
 });

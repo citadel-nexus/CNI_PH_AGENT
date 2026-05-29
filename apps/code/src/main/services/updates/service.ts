@@ -7,6 +7,7 @@ import { MAIN_TOKENS } from "../../di/tokens";
 import { isDevBuild } from "../../utils/env";
 import { logger } from "../../utils/logger";
 import { TypedEventEmitter } from "../../utils/typed-event-emitter";
+import { trackInDatadog } from "../datadog-telemetry/service";
 import type { AppLifecycleService } from "../app-lifecycle/service";
 import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import {
@@ -149,6 +150,7 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
     this.checkingForUpdates = true;
     this.emitStatus({ checking: true });
     this.performCheck();
+    trackInDatadog("updates.check.initiated", { source });
 
     return { success: true };
   }
@@ -171,7 +173,9 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
     });
 
     try {
-      // Set the flag FIRST so before-quit handler won't prevent quit
+      trackInDatadog("updates.install.initiated", {
+        version: this.downloadedVersion ?? "unknown",
+      });
       this.lifecycleService.setQuittingForUpdate();
 
       // Do lightweight cleanup: kill processes, shut down watchers

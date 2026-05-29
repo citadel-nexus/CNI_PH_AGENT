@@ -28,6 +28,7 @@
     "type": "stdio",
     "command": "npx",
     "args": ["-y", "@anthropic-ai/mcp-linear"],
+    "args": ["-y", "@linear/mcp-server"],
     "env": {
       "LINEAR_API_KEY": "${LINEAR_API_KEY}"
     }
@@ -38,6 +39,9 @@
     "args": ["-y", "@anthropic-ai/mcp-n8n"],
     "env": {
       "N8N_API_URL": "${N8N_API_URL}",
+    "args": ["-y", "@n8n/mcp-server"],
+    "env": {
+      "N8N_API_URL": "${N8N_API_URL:-http://localhost:5678}",
       "N8N_API_KEY": "${N8N_API_KEY}"
     }
   }
