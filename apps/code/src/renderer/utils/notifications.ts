@@ -14,12 +14,14 @@ function truncateTitle(title: string): string {
 }
 
 function shouldNotifyForTask(taskId?: string): boolean {
+  if (taskId) {
+    const view = useNavigationStore.getState().view;
+    const viewedTaskId =
+      view.type === "task-detail" ? (view.data?.id ?? view.taskId) : undefined;
+    if (viewedTaskId === taskId) return false;
+  }
   if (!document.hasFocus()) return true;
-  if (!taskId) return false;
-  const view = useNavigationStore.getState().view;
-  const viewedTaskId =
-    view.type === "task-detail" ? (view.data?.id ?? view.taskId) : undefined;
-  return viewedTaskId !== taskId;
+  return !!taskId;
 }
 
 function sendDesktopNotification(
