@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   getRecentTrackedEvents,
-  getRecentEvents,
   identifyUser,
   resetUser,
   setCurrentUserId,
@@ -15,11 +14,6 @@ const recentEventSchema = z.object({
     z.string(),
     z.union([z.string(), z.number(), z.boolean()]),
   ),
-  name: z.string(),
-  timestamp: z.string(),
-  properties: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-    .optional(),
 });
 
 export const analyticsRouter = router({
@@ -56,6 +50,4 @@ export const analyticsRouter = router({
     )
     .output(z.array(recentEventSchema))
     .query(({ input }) => getRecentTrackedEvents(input?.limit ?? 20)),
-    .output(z.array(recentEventSchema))
-    .query(() => getRecentEvents()),
 });

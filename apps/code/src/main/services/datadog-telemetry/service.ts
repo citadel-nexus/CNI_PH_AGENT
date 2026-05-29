@@ -1,18 +1,27 @@
 import { randomUUID } from "node:crypto";
-import tracer from "dd-trace";
-import StatsD from "hot-shots";
-import { injectable, preDestroy } from "inversify";
+import * as dgram from "node:dgram";
+import { inject, injectable, postConstruct, preDestroy } from "inversify";
+import { MAIN_TOKENS } from "../../di/tokens";
 import { logger } from "../../utils/logger";
-import type { TelemetryTags } from "./schemas";
+import { AgentServiceEvent } from "../agent/schemas";
+import type { AgentService } from "../agent/service";
+import { UpdatesEvent } from "../updates/schemas";
+import type { UpdatesService } from "../updates/service";
+import type { TelemetryStatsOutput, TelemetryTags } from "./schemas";
 
-const log = logger.scope("datadog-telemetry-service");
+const log = logger.scope("datadog-telemetry");
 
-const EVENT_SOURCE = "posthog-code";
-const DEFAULT_SITE = "us5.datadoghq.com";
-const DEFAULT_ENV = "prod";
-const DEFAULT_SERVICE = "citadel-posthog-code";
+const STATSD_HOST = "localhost";
+const STATSD_PORT = 8125;
+const MAX_BUFFER_SIZE = 1400;
+const MAX_RECENT_EVENTS = 200;
 
-type DatadogSpan = ReturnType<typeof tracer.startSpan>;
+interface ActiveSpan {
+  name: string;
+  startedAt: number;
+  tags: Record<string, string>;
+}
+
 interface TrackedDatadogEvent {
   title: string;
   timestamp: number;
@@ -20,21 +29,7 @@ interface TrackedDatadogEvent {
 
 export interface DatadogSpanHandle {
   spanId: string;
-import * as dgram from "node:dgram";
-import { inject, injectable, postConstruct, preDestroy } from "inversify";
-import { MAIN_TOKENS } from "../../di/tokens";
-import { logger } from "../../utils/logger";
-import { AgentServiceEvent } from "../agent/schemas";
-import type { AgentService } from "../agent/service";
-import type { UpdatesService } from "../updates/service";
-import { UpdatesEvent } from "../updates/schemas";
-import type { TelemetryStatsOutput } from "./schemas";
-
-const log = logger.scope("datadog-telemetry");
-
-const STATSD_HOST = "localhost";
-const STATSD_PORT = 8125;
-const MAX_BUFFER_SIZE = 1400;
+}
 
 let _instance: DatadogTelemetryService | null = null;
 
@@ -46,222 +41,20 @@ export function trackInDatadog(
   eventName: string,
   properties?: Record<string, string | number | boolean>,
 ): void {
-  _instance?.increment(`app.event.${eventName}`, tagsFromProperties(properties));
-}
-
-function tagsFromProperties(
-  props?: Record<string, string | number | boolean>,
-): Record<string, string> | undefined {
-  if (!props) return undefined;
-  const tags: Record<string, string> = {};
-  for (const [k, v] of Object.entries(props)) {
-    tags[k] = String(v);
-  }
-  return tags;
+  _instance?.increment(`app.event.${eventName}`, properties);
 }
 
 @injectable()
 export class DatadogTelemetryService {
-  private static tracerReady = false;
-  private readonly site = process.env.DD_SITE || DEFAULT_SITE;
-  private readonly env = process.env.DD_ENV || DEFAULT_ENV;
-  private readonly service = process.env.DD_SERVICE || DEFAULT_SERVICE;
-  private readonly apiKey = process.env.DD_API_KEY;
-  private readonly spans = new Map<string, DatadogSpan>();
-  private readonly recentEvents: TrackedDatadogEvent[] = [];
-  private readonly statsd: StatsD;
-  private metricCalls = 0;
-  private errorMetricCalls = 0;
-
-  constructor() {
-    if (!DatadogTelemetryService.tracerReady) {
-      tracer.init({
-        env: this.env,
-        service: this.service,
-        logInjection: true,
-      });
-      DatadogTelemetryService.tracerReady = true;
-    }
-
-    this.statsd = new StatsD({
-      host: process.env.DD_AGENT_HOST ?? "127.0.0.1",
-      port: Number(process.env.DD_DOGSTATSD_PORT ?? 8125),
-      globalTags: {
-        env: this.env,
-        service: this.service,
-      },
-      telegraf: false,
-      errorHandler: (error) => {
-        log.debug("DogStatsD metric send failed", {
-          error: error.message,
-        });
-      },
-    });
-  }
-
-  public startSpan(name: string, tags?: TelemetryTags): DatadogSpanHandle {
-    const spanId = randomUUID();
-    const span = tracer.startSpan(name, {
-      tags: this.normalizeTags(tags),
-    });
-    this.spans.set(spanId, span);
-    return { spanId };
-  }
-
-  public endSpan(span: DatadogSpanHandle | string): void {
-    const spanId = typeof span === "string" ? span : span.spanId;
-    const activeSpan = this.spans.get(spanId);
-    if (!activeSpan) {
-      return;
-    }
-
-    activeSpan.finish();
-    this.spans.delete(spanId);
-  }
-
-  public incrementMetric(name: string, tags?: TelemetryTags): void {
-    this.recordMetric(name, tags);
-    this.statsd.increment(name, 1, undefined, this.toTagList(tags));
-  }
-
-  public gauge(name: string, value: number, tags?: TelemetryTags): void {
-    this.recordMetric(name, tags);
-    this.statsd.gauge(name, value, undefined, this.toTagList(tags));
-  }
-
-  public histogram(name: string, value: number, tags?: TelemetryTags): void {
-    this.recordMetric(name, tags);
-    this.statsd.histogram(name, value, undefined, this.toTagList(tags));
-  }
-
-  public async trackEvent(
-    title: string,
-    text: string,
-    tags?: TelemetryTags,
-  ): Promise<void> {
-    this.recordEvent(title);
-
-    if (!this.apiKey) {
-      return;
-    }
-
-    const endpoint = `https://api.${this.site}/api/v1/events`;
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "DD-API-KEY": this.apiKey,
-        },
-        body: JSON.stringify({
-          title,
-          text,
-          alert_type: "info",
-          source_type_name: EVENT_SOURCE,
-          tags: this.toTagList(tags),
-        }),
-      });
-
-      if (!response.ok) {
-        log.warn("Failed to send Datadog event", {
-          status: response.status,
-          statusText: response.statusText,
-          title,
-        });
-      }
-    } catch (error) {
-      log.warn("Datadog event request failed", {
-        error: error instanceof Error ? error.message : String(error),
-        title,
-      });
-    }
-  }
-
-  public getDashboardStatus(): {
-    activeAlerts: number;
-    errorRate: number;
-    apmHealthy: boolean;
-    recentEventCount: number;
-    lastEventAt: string | null;
-  } {
-    const now = Date.now();
-    const lookbackWindowMs = 15 * 60 * 1000;
-    const activeAlerts = this.recentEvents.filter(
-      (event) =>
-        now - event.timestamp <= lookbackWindowMs &&
-        /(error|failed|alert)/i.test(event.title),
-    ).length;
-
-    const errorRate =
-      this.metricCalls === 0
-        ? 0
-        : (this.errorMetricCalls / this.metricCalls) * 100;
-    const lastEvent = this.recentEvents[this.recentEvents.length - 1];
-
-    return {
-      activeAlerts,
-      errorRate: Number(errorRate.toFixed(2)),
-      apmHealthy: activeAlerts === 0,
-      recentEventCount: this.recentEvents.length,
-      lastEventAt: lastEvent
-        ? new Date(lastEvent.timestamp).toISOString()
-        : null,
-    };
-  }
-
-  private toTagList(tags?: TelemetryTags): string[] {
-    if (!tags) {
-      return [`env:${this.env}`, `service:${this.service}`];
-    }
-
-    const normalized = this.normalizeTags(tags);
-    return Object.entries(normalized).map(([key, value]) => `${key}:${value}`);
-  }
-
-  private normalizeTags(tags?: TelemetryTags): Record<string, string> {
-    return {
-      env: this.env,
-      service: this.service,
-      ...(tags
-        ? Object.fromEntries(
-            Object.entries(tags).map(([key, value]) => [key, String(value)]),
-          )
-        : {}),
-    };
-  }
-
-  private recordMetric(name: string, tags?: TelemetryTags): void {
-    this.metricCalls += 1;
-    const normalized = this.normalizeTags(tags);
-    if (
-      name.includes("error") ||
-      normalized.status === "failed" ||
-      normalized.status === "error"
-    ) {
-      this.errorMetricCalls += 1;
-    }
-  }
-
-  private recordEvent(title: string): void {
-    this.recentEvents.push({
-      title,
-      timestamp: Date.now(),
-    });
-    if (this.recentEvents.length > 200) {
-      this.recentEvents.splice(0, this.recentEvents.length - 200);
-    }
-  }
-
-  @preDestroy()
-  public shutdown(): void {
-    for (const spanId of this.spans.keys()) {
-      this.endSpan(spanId);
-    }
-    this.statsd.close();
   private socket: dgram.Socket | null = null;
   private enabled = false;
-  private env: string;
-  private serviceTag: string;
+  private readonly env: string;
+  private readonly serviceTag: string;
+
+  private readonly spans = new Map<string, ActiveSpan>();
+  private readonly recentEvents: TrackedDatadogEvent[] = [];
+  private metricCalls = 0;
+  private errorMetricCalls = 0;
 
   private agentStats = {
     sessionsStarted: 0,
@@ -278,10 +71,25 @@ export class DatadogTelemetryService {
     installsInitiated: 0,
   };
 
+  private cbfStats = {
+    blueprintRefreshes: 0,
+    blueprintSelections: 0,
+    growthCycles: 0,
+    domainCoverageScore: null as number | null,
+    buildsStarted: 0,
+    buildsCompleted: 0,
+    buildFailures: 0,
+    buildIterations: 0,
+    lastBuildDurationMs: null as number | null,
+    sessionsStarted: 0,
+    sessionsEnded: 0,
+    sessionFailures: 0,
+  };
+
   private eventsEmitted = 0;
 
   private readonly onLlmActivity = (): void => {
-    this.agentStats.llmActivityCount++;
+    this.agentStats.llmActivityCount += 1;
     this.increment("agent.llm.activity");
   };
 
@@ -293,16 +101,31 @@ export class DatadogTelemetryService {
     taskRunId: string;
     payload: unknown;
   }): void => {
-    const msg = payload.payload as { type?: string };
-    if (msg?.type === "session_started") {
-      this.agentStats.sessionsStarted++;
+    const message = payload.payload as {
+      type?: string;
+      durationMs?: number;
+      duration_ms?: number;
+    };
+
+    if (message.type === "session_started") {
+      this.agentStats.sessionsStarted += 1;
       this.increment("agent.sessions.started");
-    } else if (
-      msg?.type === "session_ended" ||
-      msg?.type === "session_stopped"
-    ) {
-      this.agentStats.sessionsEnded++;
+      return;
+    }
+
+    if (message.type === "session_ended" || message.type === "session_stopped") {
+      this.agentStats.sessionsEnded += 1;
+      const durationMs = Number(message.durationMs ?? message.duration_ms);
+      if (Number.isFinite(durationMs) && durationMs >= 0) {
+        this.agentStats.lastSessionDurationMs = durationMs;
+      }
       this.increment("agent.sessions.ended");
+      return;
+    }
+
+    if (message.type === "session_error") {
+      this.agentStats.sessionErrors += 1;
+      this.increment("agent.sessions.error");
     }
   };
 
@@ -312,14 +135,16 @@ export class DatadogTelemetryService {
     updateReady?: boolean;
   }): void => {
     if (payload.checking && !payload.downloading) {
-      this.updateStats.checksInitiated++;
+      this.updateStats.checksInitiated += 1;
       this.increment("updates.check.started");
     }
+
     if (payload.downloading) {
       this.increment("updates.downloading");
     }
+
     if (payload.updateReady) {
-      this.updateStats.downloadsStarted++;
+      this.updateStats.downloadsStarted += 1;
       this.increment("updates.ready");
     }
   };
@@ -327,10 +152,10 @@ export class DatadogTelemetryService {
   private readonly onUpdateReady = (payload: {
     version: string | null;
   }): void => {
-    this.increment("updates.installed", {
+    this.updateStats.installsInitiated += 1;
+    this.increment("updates.install.initiated", {
       version: payload.version ?? "unknown",
     });
-    this.updateStats.installsInitiated++;
   };
 
   constructor(
@@ -340,11 +165,11 @@ export class DatadogTelemetryService {
     private readonly updatesService: UpdatesService,
   ) {
     this.env = process.env.DD_ENV ?? "development";
-    this.serviceTag = "posthog-code";
+    this.serviceTag = process.env.DD_SERVICE ?? "posthog-code";
   }
 
   @postConstruct()
-  init(): void {
+  public init(): void {
     _instance = this;
     this.setupSocket();
     this.subscribeToAgentEvents();
@@ -353,7 +178,7 @@ export class DatadogTelemetryService {
   }
 
   @preDestroy()
-  shutdown(): void {
+  public shutdown(): void {
     this.agentService.off(AgentServiceEvent.LlmActivity, this.onLlmActivity);
     this.agentService.off(AgentServiceEvent.SessionsIdle, this.onSessionsIdle);
     this.agentService.off(AgentServiceEvent.SessionEvent, this.onSessionEvent);
@@ -365,62 +190,117 @@ export class DatadogTelemetryService {
       this.socket = null;
     }
 
+    this.spans.clear();
     _instance = null;
   }
 
-  getStats(): TelemetryStatsOutput {
+  public getStats(): TelemetryStatsOutput {
     return {
       agent: { ...this.agentStats },
       updates: { ...this.updateStats },
+      cbf: { ...this.cbfStats },
       eventsEmitted: this.eventsEmitted,
       statsdEnabled: this.enabled,
     };
   }
 
-  increment(name: string, tags?: Record<string, string>): void {
-    this.send(`${this.metricName(name)}:1|c${this.formatTags(tags)}`);
+  public getDashboardStatus(): {
+    activeAlerts: number;
+    errorRate: number;
+    apmHealthy: boolean;
+    recentEventCount: number;
+    lastEventAt: string | null;
+  } {
+    const now = Date.now();
+    const lookbackWindowMs = 15 * 60 * 1000;
+    const activeAlerts = this.recentEvents.filter(
+      (event) =>
+        now - event.timestamp <= lookbackWindowMs &&
+        /(error|failed|alert)/i.test(event.title),
+    ).length;
+    const errorRate =
+      this.metricCalls === 0
+        ? 0
+        : Number(((this.errorMetricCalls / this.metricCalls) * 100).toFixed(2));
+    const lastEvent = this.recentEvents[this.recentEvents.length - 1];
+
+    return {
+      activeAlerts,
+      errorRate,
+      apmHealthy: activeAlerts === 0,
+      recentEventCount: this.recentEvents.length,
+      lastEventAt: lastEvent ? new Date(lastEvent.timestamp).toISOString() : null,
+    };
   }
 
-  gauge(name: string, value: number, tags?: Record<string, string>): void {
-    this.send(`${this.metricName(name)}:${value}|g${this.formatTags(tags)}`);
+  public startSpan(name: string, tags?: TelemetryTags): DatadogSpanHandle {
+    const spanId = randomUUID();
+    this.spans.set(spanId, {
+      name,
+      startedAt: Date.now(),
+      tags: this.normalizeTags(tags),
+    });
+    return { spanId };
   }
 
-  histogram(name: string, value: number, tags?: Record<string, string>): void {
-    this.send(`${this.metricName(name)}:${value}|h${this.formatTags(tags)}`);
+  public endSpan(span: DatadogSpanHandle | string): void {
+    const spanId = typeof span === "string" ? span : span.spanId;
+    this.spans.delete(spanId);
   }
 
-  trackEvent(
+  public incrementMetric(name: string, tags?: TelemetryTags): void {
+    this.increment(name, tags);
+  }
+
+  public increment(name: string, tags?: TelemetryTags): void {
+    const normalized = this.normalizeTags(tags);
+    this.recordMetric(name, normalized);
+    this.recordCbfMetric(name, "increment", 1, normalized);
+    this.send(`${this.metricName(name)}:1|c${this.formatTags(normalized)}`);
+  }
+
+  public gauge(name: string, value: number, tags?: TelemetryTags): void {
+    const normalized = this.normalizeTags(tags);
+    this.recordMetric(name, normalized);
+    this.recordCbfMetric(name, "gauge", value, normalized);
+    this.send(`${this.metricName(name)}:${value}|g${this.formatTags(normalized)}`);
+  }
+
+  public histogram(name: string, value: number, tags?: TelemetryTags): void {
+    const normalized = this.normalizeTags(tags);
+    this.recordMetric(name, normalized);
+    this.recordCbfMetric(name, "histogram", value, normalized);
+    this.send(`${this.metricName(name)}:${value}|h${this.formatTags(normalized)}`);
+  }
+
+  public async trackEvent(
     title: string,
     text: string,
-    tags?: string[],
-  ): void {
-    const allTags = [
-      `env:${this.env}`,
-      `service:${this.serviceTag}`,
-      ...(tags ?? []),
-    ];
-    const tagString = allTags.join(",");
-    const msg = `_e{${title.length},${text.length}}:${title}|${text}|#${tagString}`;
-    this.send(msg);
-    this.eventsEmitted++;
+    tags?: TelemetryTags | string[],
+  ): Promise<void> {
+    const normalized = this.normalizeTags(tags);
+    const tagsForEvent = this.formatTagEntries(normalized).join(",");
+    const message = `_e{${title.length},${text.length}}:${title}|${text}|#${tagsForEvent}`;
+    this.send(message);
+    this.eventsEmitted += 1;
+    this.recordEvent(title);
   }
 
   private setupSocket(): void {
-    const apiKey = process.env.DD_API_KEY;
-    if (!apiKey) {
+    if (!process.env.DD_API_KEY) {
       log.info("DD_API_KEY not set; StatsD metrics disabled");
       return;
     }
 
     try {
       this.socket = dgram.createSocket("udp4");
-      this.socket.on("error", (err) => {
-        log.warn("StatsD socket error", { error: err.message });
+      this.socket.on("error", (error) => {
+        log.warn("StatsD socket error", { error: error.message });
       });
       this.enabled = true;
-    } catch (err) {
+    } catch (error) {
       log.warn("Failed to create StatsD socket", {
-        error: err instanceof Error ? err.message : String(err),
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -440,26 +320,141 @@ export class DatadogTelemetryService {
     return `posthog_code.${name}`;
   }
 
-  private formatTags(tags?: Record<string, string>): string {
-    const defaultTags: Record<string, string> = {
+  private formatTagEntries(tags?: Record<string, string>): string[] {
+    const mergedTags = {
       env: this.env,
       service: this.serviceTag,
+      ...(tags ?? {}),
     };
-    const merged = { ...defaultTags, ...tags };
-    const tagList = Object.entries(merged).map(([k, v]) => `${k}:${v}`);
-    return tagList.length > 0 ? `|#${tagList.join(",")}` : "";
+    return Object.entries(mergedTags).map(([key, value]) => `${key}:${value}`);
+  }
+
+  private formatTags(tags?: Record<string, string>): string {
+    const tagEntries = this.formatTagEntries(tags);
+    return tagEntries.length > 0 ? `|#${tagEntries.join(",")}` : "";
+  }
+
+  private normalizeTags(tags?: TelemetryTags | string[]): Record<string, string> {
+    if (!tags) {
+      return {};
+    }
+
+    if (Array.isArray(tags)) {
+      const fromList: Record<string, string> = {};
+      for (const tag of tags) {
+        const separatorIndex = tag.indexOf(":");
+        if (separatorIndex <= 0 || separatorIndex === tag.length - 1) {
+          continue;
+        }
+        const key = tag.slice(0, separatorIndex);
+        const value = tag.slice(separatorIndex + 1);
+        fromList[key] = value;
+      }
+      return fromList;
+    }
+
+    return Object.fromEntries(
+      Object.entries(tags).map(([key, value]) => [key, String(value)]),
+    );
+  }
+
+  private recordMetric(name: string, tags: Record<string, string>): void {
+    this.metricCalls += 1;
+    if (
+      name.includes("error") ||
+      tags.status === "failed" ||
+      tags.status === "error"
+    ) {
+      this.errorMetricCalls += 1;
+    }
+  }
+
+  private recordEvent(title: string): void {
+    this.recentEvents.push({
+      title,
+      timestamp: Date.now(),
+    });
+    if (this.recentEvents.length > MAX_RECENT_EVENTS) {
+      this.recentEvents.splice(0, this.recentEvents.length - MAX_RECENT_EVENTS);
+    }
+  }
+
+  private recordCbfMetric(
+    name: string,
+    kind: "increment" | "gauge" | "histogram",
+    value: number,
+    tags: Record<string, string>,
+  ): void {
+    if (name === "cbf.pull.blueprint_refresh" && kind === "increment") {
+      this.cbfStats.blueprintRefreshes += 1;
+      return;
+    }
+
+    if (name === "cbf.pull.blueprint_select" && kind === "increment") {
+      this.cbfStats.blueprintSelections += 1;
+      return;
+    }
+
+    if (name === "cbf.fleet.growth_cycle" && kind === "increment") {
+      this.cbfStats.growthCycles += 1;
+      return;
+    }
+
+    if (name === "cbf.fleet.domain_coverage" && kind === "gauge") {
+      this.cbfStats.domainCoverageScore = value;
+      return;
+    }
+
+    if (name === "cbf.build.started" && kind === "increment") {
+      this.cbfStats.buildsStarted += 1;
+      return;
+    }
+
+    if (name === "cbf.build.completed" && kind === "increment") {
+      this.cbfStats.buildsCompleted += 1;
+      if (tags.status === "failure" || tags.status === "error") {
+        this.cbfStats.buildFailures += 1;
+      }
+      return;
+    }
+
+    if (name === "cbf.build.iterate" && kind === "increment") {
+      this.cbfStats.buildIterations += 1;
+      return;
+    }
+
+    if (name === "cbf.build.duration_ms" && kind === "histogram") {
+      this.cbfStats.lastBuildDurationMs = value;
+      return;
+    }
+
+    if (name === "cbf.session.started" && kind === "increment") {
+      this.cbfStats.sessionsStarted += 1;
+      return;
+    }
+
+    if (name === "cbf.session.ended" && kind === "increment") {
+      this.cbfStats.sessionsEnded += 1;
+      if (tags.status === "failure" || tags.status === "error") {
+        this.cbfStats.sessionFailures += 1;
+      }
+    }
   }
 
   private send(payload: string): void {
-    if (!this.socket || !this.enabled) return;
-    const buf = Buffer.from(payload);
-    if (buf.length > MAX_BUFFER_SIZE) {
-      log.warn("StatsD payload too large, skipping", { size: buf.length });
+    if (!this.socket || !this.enabled) {
       return;
     }
-    this.socket.send(buf, STATSD_PORT, STATSD_HOST, (err) => {
-      if (err) {
-        log.warn("StatsD send error", { error: err.message });
+
+    const buffer = Buffer.from(payload);
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      log.warn("StatsD payload too large, skipping", { size: buffer.length });
+      return;
+    }
+
+    this.socket.send(buffer, STATSD_PORT, STATSD_HOST, (error) => {
+      if (error) {
+        log.warn("StatsD send error", { error: error.message });
       }
     });
   }

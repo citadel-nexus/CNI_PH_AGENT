@@ -3,41 +3,31 @@ import { getAppVersion } from "../utils/env";
 import { logger } from "../utils/logger";
 import { trackInDatadog } from "./datadog-telemetry/service";
 
-let posthogClient: PostHog | null = null;
-let currentUserId: string | null = null;
 const log = logger.scope("posthog-analytics-service");
+
 const DATADOG_SITE = process.env.DD_SITE || "us5.datadoghq.com";
 const DATADOG_API_KEY = process.env.DD_API_KEY;
 const DATADOG_ENV = process.env.DD_ENV || "prod";
 const DATADOG_SERVICE = process.env.DD_SERVICE || "citadel-posthog-code";
-const MAX_RECENT_EVENTS = 100;
+const MAX_RECENT_EVENTS = 50;
 
-interface MainAnalyticsEvent {
+export interface RecentEvent {
   eventName: string;
   timestamp: string;
   properties: Record<string, string | number | boolean>;
 }
 
-const recentEvents: MainAnalyticsEvent[] = [];
-
-const MAX_RECENT_EVENTS = 50;
-
-export interface RecentEvent {
-  name: string;
-  timestamp: string;
-  properties?: Record<string, string | number | boolean>;
-}
-
+let posthogClient: PostHog | null = null;
+let currentUserId: string | null = null;
 const recentEvents: RecentEvent[] = [];
 
-export function initializePostHog() {
+export function initializePostHog(): PostHog | null {
   if (posthogClient) {
     return posthogClient;
   }
 
   const apiKey = process.env.VITE_POSTHOG_API_KEY;
   const apiHost = process.env.VITE_POSTHOG_API_HOST;
-
   if (!apiKey) {
     return null;
   }
@@ -46,24 +36,22 @@ export function initializePostHog() {
     host: apiHost || "https://internal-c.posthog.com",
     enableExceptionAutocapture: true,
   });
-
   return posthogClient;
 }
 
-export function setCurrentUserId(userId: string | null) {
+export function setCurrentUserId(userId: string | null): void {
   currentUserId = userId;
 }
 
-export function getCurrentUserId() {
+export function getCurrentUserId(): string | null {
   return currentUserId;
 }
 
 export function trackAppEvent(
   eventName: string,
   properties?: Record<string, string | number | boolean>,
-) {
+): void {
   const distinctId = currentUserId || "anonymous-app-event";
-
   const eventProperties = {
     team: "posthog-code",
     ...properties,
@@ -79,74 +67,61 @@ export function trackAppEvent(
     });
   }
 
+  trackInDatadog(eventName, eventProperties);
   recordRecentEvent(eventName, eventProperties);
   void forwardAppEventToDatadog(eventName, eventProperties);
-  posthogClient.capture({
-    distinctId,
-    event: eventName,
-    properties: {
-      team: "posthog-code",
-      ...properties,
-      app_version: getAppVersion(),
-      $process_person_profile: !!currentUserId,
-    },
-  });
-
-  trackInDatadog(eventName, properties);
-
-  recentEvents.unshift({
-    name: eventName,
-    timestamp: new Date().toISOString(),
-    properties,
-  });
-  if (recentEvents.length > MAX_RECENT_EVENTS) {
-    recentEvents.splice(MAX_RECENT_EVENTS);
-  }
 }
 
-export function getRecentEvents(): RecentEvent[] {
-  return recentEvents.slice();
+export function getRecentEvents(limit = 20): RecentEvent[] {
+  const normalizedLimit = Math.max(1, limit);
+  return recentEvents.slice(-normalizedLimit).reverse();
+}
+
+export function getRecentTrackedEvents(limit = 20): RecentEvent[] {
+  return getRecentEvents(limit);
 }
 
 export function identifyUser(
   userId: string,
   properties?: Record<string, string | number | boolean>,
-) {
+): void {
   if (!posthogClient) {
     return;
   }
 
   currentUserId = userId;
-
   posthogClient.identify({
     distinctId: userId,
     properties,
   });
 }
 
-export async function shutdownPostHog() {
-  if (posthogClient) {
-    await posthogClient.shutdown();
-    posthogClient = null;
+export async function shutdownPostHog(): Promise<void> {
+  if (!posthogClient) {
+    return;
   }
+
+  await posthogClient.shutdown();
+  posthogClient = null;
 }
 
-export function getPostHogClient() {
+export function getPostHogClient(): PostHog | null {
   return posthogClient;
 }
 
-export function resetUser() {
+export function resetUser(): void {
   currentUserId = null;
 }
 
 export async function forwardAppEventToDatadog(
   eventName: string,
   properties?: Record<string, string | number | boolean>,
-) {
+): Promise<void> {
   if (!DATADOG_API_KEY) {
     return;
   }
 
+  const endpoint = `https://api.${DATADOG_SITE}/api/v1/events`;
   const tags = {
     env: DATADOG_ENV,
     service: DATADOG_SERVICE,
@@ -154,8 +129,6 @@ export async function forwardAppEventToDatadog(
     event_name: eventName,
     ...(properties ?? {}),
   };
-
-  const endpoint = `https://api.${DATADOG_SITE}/api/v1/events`;
 
   try {
     const response = await fetch(endpoint, {
@@ -187,14 +160,10 @@ export async function forwardAppEventToDatadog(
   }
 }
 
-export function getRecentTrackedEvents(limit = 20): MainAnalyticsEvent[] {
-  return recentEvents.slice(-Math.max(1, limit)).reverse();
-}
-
 export function captureException(
   error: unknown,
   additionalProperties?: Record<string, unknown>,
-) {
+): void {
   if (!posthogClient) {
     return;
   }
@@ -205,6 +174,7 @@ export function captureException(
     ...additionalProperties,
     app_version: getAppVersion(),
   });
+
   void forwardAppEventToDatadog("main_exception", {
     app_version: getAppVersion(),
     message: error instanceof Error ? error.message : String(error),
