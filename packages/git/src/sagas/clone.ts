@@ -50,7 +50,7 @@ export class CloneSaga extends Saga<CloneInput, CloneOutput> {
           },
         });
       },
-      { signal, waitForExternalLock: false },
+      { signal, waitForExternalLock: false, operationName: "clone" },
     );
 
     return { targetPath };

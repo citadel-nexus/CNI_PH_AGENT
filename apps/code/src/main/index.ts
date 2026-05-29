@@ -12,6 +12,7 @@ import { MAIN_TOKENS } from "./di/tokens";
 import { registerMcpSandboxProtocol } from "./protocols/mcp-sandbox";
 import type { AppLifecycleService } from "./services/app-lifecycle/service";
 import type { AuthService } from "./services/auth/service";
+import type { DatadogTelemetryService } from "./services/datadog-telemetry/service";
 import type { ExternalAppsService } from "./services/external-apps/service";
 import type { GitHubIntegrationService } from "./services/github-integration/service";
 import type { InboxLinkService } from "./services/inbox-link/service";
@@ -156,6 +157,7 @@ async function initializeServices(): Promise<void> {
   container.get<SlackIntegrationService>(MAIN_TOKENS.SlackIntegrationService);
   container.get<ExternalAppsService>(MAIN_TOKENS.ExternalAppsService);
   container.get<PosthogPluginService>(MAIN_TOKENS.PosthogPluginService);
+  container.get<DatadogTelemetryService>(MAIN_TOKENS.DatadogTelemetryService);
 
   await authService.initialize();
 

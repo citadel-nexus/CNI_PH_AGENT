@@ -50,6 +50,7 @@ export const MAIN_TOKENS = Object.freeze({
   CloudTaskService: Symbol.for("Main.CloudTaskService"),
   ConnectivityService: Symbol.for("Main.ConnectivityService"),
   ContextMenuService: Symbol.for("Main.ContextMenuService"),
+  DatadogTelemetryService: Symbol.for("Main.DatadogTelemetryService"),
 
   ExternalAppsService: Symbol.for("Main.ExternalAppsService"),
   LlmGatewayService: Symbol.for("Main.LlmGatewayService"),
@@ -63,6 +64,7 @@ export const MAIN_TOKENS = Object.freeze({
   HandoffService: Symbol.for("Main.HandoffService"),
   GitHubIntegrationService: Symbol.for("Main.GitHubIntegrationService"),
   LinearIntegrationService: Symbol.for("Main.LinearIntegrationService"),
+  N8nIntegrationService: Symbol.for("Main.N8nIntegrationService"),
   SlackIntegrationService: Symbol.for("Main.SlackIntegrationService"),
   LocalLogsService: Symbol.for("Main.LocalLogsService"),
   DeepLinkService: Symbol.for("Main.DeepLinkService"),
@@ -84,4 +86,7 @@ export const MAIN_TOKENS = Object.freeze({
   WorkspaceService: Symbol.for("Main.WorkspaceService"),
   EnrichmentService: Symbol.for("Main.EnrichmentService"),
   UsageMonitorService: Symbol.for("Main.UsageMonitorService"),
+  DatadogTelemetryService: Symbol.for("Main.DatadogTelemetryService"),
+  N8nIntegrationService: Symbol.for("Main.N8nIntegrationService"),
+  PluginSyncService: Symbol.for("Main.PluginSyncService"),
 });

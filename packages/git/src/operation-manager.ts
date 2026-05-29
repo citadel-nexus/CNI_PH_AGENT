@@ -39,10 +39,28 @@ interface RepoState {
   lastAccess: number;
 }
 
+type GitTelemetryTags = Record<string, string | number | boolean>;
+
+export interface GitOperationTelemetry {
+  startSpan: (name: string, tags?: GitTelemetryTags) => unknown;
+  endSpan: (span: unknown) => void;
+  incrementMetric: (name: string, tags?: GitTelemetryTags) => void;
+  histogram: (name: string, value: number, tags?: GitTelemetryTags) => void;
+}
+
+let gitOperationTelemetry: GitOperationTelemetry | null = null;
+
+export function configureGitOperationTelemetry(
+  telemetry: GitOperationTelemetry | null,
+): void {
+  gitOperationTelemetry = telemetry;
+}
+
 export interface ExecuteOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
   waitForExternalLock?: boolean;
+  operationName?: string;
   /**
    * Extra env vars merged on top of `getCleanEnv()` for the spawned git
    * subprocess. Used to pass through SessionStart-hook env (e.g.
@@ -93,6 +111,17 @@ class GitOperationManagerImpl {
     operation: (git: GitClient) => Promise<T>,
     options?: ExecuteOptions,
   ): Promise<T> {
+    const operationName = options?.operationName ?? "read";
+    const tags: GitTelemetryTags = {
+      operation: operationName,
+      mode: "read",
+      repo_path: repoPath,
+    };
+    const span = gitOperationTelemetry?.startSpan(
+      `git.operation.${operationName}`,
+      tags,
+    );
+    const startedAt = Date.now();
     const state = this.getRepoState(repoPath);
     const env = {
       ...getCleanEnv(),
@@ -100,14 +129,32 @@ class GitOperationManagerImpl {
       ...options?.env,
     };
 
-    if (options?.signal) {
-      const scopedGit = createGitClient(repoPath, {
-        abortSignal: options.signal,
-      });
-      return operation(scopedGit.env(env));
-    }
+    try {
+      if (options?.signal) {
+        const scopedGit = createGitClient(repoPath, {
+          abortSignal: options.signal,
+        });
+        const result = await operation(scopedGit.env(env));
+        gitOperationTelemetry?.incrementMetric("git.operation.success", tags);
+        return result;
+      }
 
-    return operation(state.client.env(env));
+      const result = await operation(state.client.env(env));
+      gitOperationTelemetry?.incrementMetric("git.operation.success", tags);
+      return result;
+    } catch (error) {
+      gitOperationTelemetry?.incrementMetric("git.operation.error", tags);
+      throw error;
+    } finally {
+      gitOperationTelemetry?.histogram(
+        "git.operation.duration_ms",
+        Date.now() - startedAt,
+        tags,
+      );
+      if (span) {
+        gitOperationTelemetry?.endSpan(span);
+      }
+    }
   }
 
   async executeWrite<T>(
@@ -115,6 +162,17 @@ class GitOperationManagerImpl {
     operation: (git: GitClient) => Promise<T>,
     options?: ExecuteOptions,
   ): Promise<T> {
+    const operationName = options?.operationName ?? "write";
+    const tags: GitTelemetryTags = {
+      operation: operationName,
+      mode: "write",
+      repo_path: repoPath,
+    };
+    const span = gitOperationTelemetry?.startSpan(
+      `git.operation.${operationName}`,
+      tags,
+    );
+    const startedAt = Date.now();
     const state = this.getRepoState(repoPath);
 
     if (options?.waitForExternalLock !== false) {
@@ -135,16 +193,29 @@ class GitOperationManagerImpl {
         const scopedGit = createGitClient(repoPath, {
           abortSignal: options.signal,
         });
-        return await operation(scopedGit.env(env));
+        const result = await operation(scopedGit.env(env));
+        gitOperationTelemetry?.incrementMetric("git.operation.success", tags);
+        return result;
       }
 
-      return await operation(state.client.env(env));
+      const result = await operation(state.client.env(env));
+      gitOperationTelemetry?.incrementMetric("git.operation.success", tags);
+      return result;
     } catch (error) {
+      gitOperationTelemetry?.incrementMetric("git.operation.error", tags);
       if (options?.signal?.aborted) {
         await removeLock(repoPath).catch(() => {});
       }
       throw error;
     } finally {
+      gitOperationTelemetry?.histogram(
+        "git.operation.duration_ms",
+        Date.now() - startedAt,
+        tags,
+      );
+      if (span) {
+        gitOperationTelemetry?.endSpan(span);
+      }
       state.lock.releaseWrite();
     }
   }

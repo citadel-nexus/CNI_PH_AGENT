@@ -35,8 +35,19 @@ export abstract class GitSaga<
         this._git = git;
         return this.executeGitOperations(input);
       },
-      { signal: input.signal, env: input.env },
+      {
+        signal: input.signal,
+        env: input.env,
+        operationName: this.getOperationName(),
+      },
     );
+  }
+
+  protected getOperationName(): string {
+    return this.sagaName
+      .replace(/Saga$/, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .toLowerCase();
   }
 
   protected abstract executeGitOperations(input: TInput): Promise<TOutput>;

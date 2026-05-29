@@ -17,6 +17,10 @@ export class CreateBranchSaga extends GitSaga<
 > {
   readonly sagaName = "CreateBranchSaga";
 
+  protected override getOperationName(): string {
+    return "checkout";
+  }
+
   protected async executeGitOperations(
     input: CreateBranchInput,
   ): Promise<CreateBranchOutput> {
@@ -58,6 +62,10 @@ export class SwitchBranchSaga extends GitSaga<
 > {
   readonly sagaName = "SwitchBranchSaga";
 
+  protected override getOperationName(): string {
+    return "checkout";
+  }
+
   protected async executeGitOperations(
     input: SwitchBranchInput,
   ): Promise<SwitchBranchOutput> {
@@ -95,6 +103,10 @@ export class CreateOrSwitchBranchSaga extends GitSaga<
 > {
   readonly sagaName = "CreateOrSwitchBranchSaga";
   private branchCreated = false;
+
+  protected override getOperationName(): string {
+    return "checkout";
+  }
 
   protected async executeGitOperations(
     input: CreateOrSwitchBranchInput,
@@ -162,6 +174,10 @@ export class ResetToDefaultBranchSaga extends GitSaga<
   ResetToDefaultBranchOutput
 > {
   readonly sagaName = "ResetToDefaultBranchSaga";
+
+  protected override getOperationName(): string {
+    return "checkout";
+  }
 
   protected async executeGitOperations(
     _input: ResetToDefaultBranchInput,

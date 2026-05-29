@@ -21,9 +21,7 @@ const mockClientSideConnection = vi.hoisted(() =>
     this.initialize = vi.fn().mockResolvedValue({});
     this.newSession = mockNewSession;
     this.loadSession = vi.fn().mockResolvedValue({ configOptions: [] });
-    this.unstable_resumeSession = vi
-      .fn()
-      .mockResolvedValue({ configOptions: [] });
+    this.resumeSession = vi.fn().mockResolvedValue({ configOptions: [] });
   }),
 );
 
@@ -91,9 +89,12 @@ vi.mock("@posthog/agent/posthog-api", () => ({
 }));
 
 vi.mock("@posthog/agent/gateway-models", () => ({
+  DEFAULT_GATEWAY_MODEL: "claude-opus-4-8",
+  DEFAULT_CODEX_MODEL: "gpt-5.5",
   fetchGatewayModels: vi.fn().mockResolvedValue([]),
   formatGatewayModelName: vi.fn(),
   getProviderName: vi.fn(),
+  isBlockedModelId: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("@posthog/agent/adapters/claude/session/jsonl-hydration", () => ({
@@ -175,6 +176,12 @@ function createMockDependencies() {
       notifyToolResult: vi.fn(),
       notifyToolCancelled: vi.fn(),
     },
+    datadogTelemetry: {
+      increment: vi.fn(),
+      gauge: vi.fn(),
+      histogram: vi.fn(),
+      trackEvent: vi.fn(),
+    },
     powerManager: {
       onResume: vi.fn(() => () => {}),
       preventSleep: vi.fn(() => () => {}),
@@ -226,6 +233,7 @@ describe("AgentService", () => {
       deps.posthogPluginService as never,
       deps.agentAuthAdapter as never,
       deps.mcpAppsService as never,
+      deps.datadogTelemetry as never,
       deps.powerManager as never,
       deps.bundledResources as never,
       deps.appMeta as never,
