@@ -54,6 +54,7 @@ import { TypedEventEmitter } from "../../utils/typed-event-emitter";
 import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import type { FsService } from "../fs/service";
 import type { McpAppsService } from "../mcp-apps/service";
+import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import type { PosthogPluginService } from "../posthog-plugin/service";
 import type { ProcessTrackingService } from "../process-tracking/service";
 import { loadSessionEnvOverrides } from "../session-env/loader";
@@ -343,7 +344,10 @@ export class AgentService extends TypedEventEmitter<AgentServiceEvents> {
   }
 
   private getClaudeCliPath(): string {
-    return this.bundledResources.resolve(".vite/build/claude-cli/cli.js");
+    // Keep in sync with the destDir in apps/code/vite.main.config.mts
+    // (copyClaudeExecutable plugin).
+    const binary = process.platform === "win32" ? "claude.exe" : "claude";
+    return this.bundledResources.resolve(`.vite/build/claude-cli/${binary}`);
   }
 
   private getCodexBinaryPath(): string {
@@ -550,6 +554,13 @@ When creating pull requests, add the following footer at the end of the PR descr
       adapter: params.adapter ?? "claude",
       operation: "start",
     };
+    this.datadogTelemetry.increment("agent.session.started", tags);
+    this.validateSessionParams(params);
+    const config = this.toSessionConfig(params);
+    const session = await this.getOrCreateSession(config, false);
+    if (!session) {
+      this.datadogTelemetry.increment("agent.session.error", tags);
+      throw new Error("Failed to create session");
     const span = this.datadogTelemetry.startSpan("agent.session.start", tags);
 
     try {
@@ -816,7 +827,7 @@ When creating pull requests, add the following footer at the end of the PR descr
       // Claude-specific: hydrate session JSONL from PostHog before resuming.
       // If hydration finds no conversation to restore, skip the resume and
       // fall through to creating a new session. This avoids a doomed
-      // unstable_resumeSession that would fail with "Resource not found"
+      // resumeSession that would fail with "Resource not found"
       if (isReconnect && config.sessionId) {
         const existingSessionId = config.sessionId;
 
@@ -846,10 +857,10 @@ When creating pull requests, add the following footer at the end of the PR descr
       if (isReconnect && config.sessionId) {
         const existingSessionId = config.sessionId;
 
-        // Both adapters implement unstable_resumeSession:
+        // Both adapters implement resumeSession:
         // - Claude: delegates to SDK's resumeSession with JSONL hydration
         // - Codex: delegates to codex-acp's loadSession internally
-        const resumeResponse = await connection.unstable_resumeSession({
+        const resumeResponse = await connection.resumeSession({
           sessionId: existingSessionId,
           cwd: repoPath,
           mcpServers,

@@ -13,6 +13,8 @@ import {
 import { useAuthSession } from "@features/auth/hooks/useAuthSession";
 import { useIsOrgAdmin } from "@features/auth/hooks/useOrgRole";
 import { registerBillingSubscriptions } from "@features/billing/subscriptions";
+import { registerCommandCenterSubscriptions } from "@features/command-center/subscriptions";
+import { registerPluginSyncSubscriptions } from "@features/plugin-sync/subscriptions";
 import { registerPluginSyncSubscriptions } from "@features/plugin-sync/subscriptions";
 import { registerCommandCenterSubscriptions } from "@features/command-center/subscriptions";
 import { AddDirectoryDialog } from "@features/folder-picker/components/AddDirectoryDialog";
@@ -301,7 +303,7 @@ function App() {
         key="main"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: showTransition ? 1.5 : 0 }}
+        transition={{ duration: 0.5, delay: showTransition ? 0.5 : 0 }}
       >
         <MainLayout />
       </motion.div>
