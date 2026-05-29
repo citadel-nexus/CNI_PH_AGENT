@@ -68,6 +68,8 @@ import { TaskLinkService } from "../services/task-link/service";
 import { UIService } from "../services/ui/service";
 import { UpdatesService } from "../services/updates/service";
 import { UsageMonitorService } from "../services/usage-monitor/service";
+import { DatadogTelemetryService } from "../services/datadog-telemetry/service";
+import { N8nIntegrationService } from "../services/n8n-integration/service";
 import { PluginSyncService } from "../services/plugin-sync/service";
 import { WatcherRegistryService } from "../services/watcher-registry/service";
 import { WorkspaceService } from "../services/workspace/service";
@@ -150,6 +152,10 @@ container.bind(MAIN_TOKENS.SlackIntegrationService).to(SlackIntegrationService);
 container.bind(MAIN_TOKENS.UIService).to(UIService);
 container.bind(MAIN_TOKENS.UpdatesService).to(UpdatesService);
 container.bind(MAIN_TOKENS.UsageMonitorService).to(UsageMonitorService);
+container
+  .bind(MAIN_TOKENS.DatadogTelemetryService)
+  .to(DatadogTelemetryService);
+container.bind(MAIN_TOKENS.N8nIntegrationService).to(N8nIntegrationService);
 container.bind(MAIN_TOKENS.PluginSyncService).to(PluginSyncService);
 container.bind(MAIN_TOKENS.TaskLinkService).to(TaskLinkService);
 container.bind(MAIN_TOKENS.InboxLinkService).to(InboxLinkService);
