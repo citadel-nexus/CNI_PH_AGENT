@@ -54,6 +54,10 @@ export function LinearPanel() {
             </Text>
           </Flex>
           <Progress value={status.activeCycle.percentComplete} size="1" />
+          <Progress
+            value={status.activeCycle.percentComplete}
+            size="1"
+          />
           <Flex justify="between">
             <Text className="text-[10px] text-[--gray-10]">
               Open: {status.openIssueCount}
@@ -79,6 +83,9 @@ export function LinearPanel() {
               className="gap-2 border-b border-[--gray-a3] py-1 last:border-0"
             >
               <Text className="min-w-0 truncate text-[11px]">{issue.title}</Text>
+              <Text className="min-w-0 truncate text-[11px]">
+                {issue.title}
+              </Text>
               <Badge
                 color={priorityColor(issue.priority)}
                 variant="soft"

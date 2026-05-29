@@ -29,6 +29,7 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   private static readonly REPO_NAME = "CNI_PH_AGENT";
   private static readonly CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
   private static readonly CHECK_TIMEOUT_MS = 60 * 1000; // 1 minute timeout for checks
+  private static readonly INSTALL_CLEANUP_TIMEOUT_MS = 3000; // max wait for cleanup before forcing install
   private static readonly DISABLE_ENV_FLAG = "ELECTRON_DISABLE_AUTO_UPDATE";
   private static readonly SUPPORTED_PLATFORMS = ["darwin", "win32"];
 
@@ -178,9 +179,22 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
       });
       this.lifecycleService.setQuittingForUpdate();
 
-      // Do lightweight cleanup: kill processes, shut down watchers
-      // Skip container teardown so before-quit handler can still access services
-      await this.lifecycleService.shutdownWithoutContainer();
+      // Do lightweight cleanup: kill processes, shut down watchers.
+      // Race against a hard timeout so a stuck cleanup can never prevent
+      // quitAndInstall() from being called — ShipIt must always run.
+      const cleanupTimeout = new Promise<"timeout">((resolve) =>
+        setTimeout(
+          () => resolve("timeout"),
+          (this.constructor as typeof UpdatesService).INSTALL_CLEANUP_TIMEOUT_MS,
+        ),
+      );
+      const cleanupResult = await Promise.race([
+        this.lifecycleService.shutdownWithoutContainer().then(() => "done" as const),
+        cleanupTimeout,
+      ]);
+      if (cleanupResult === "timeout") {
+        log.warn("Cleanup timed out before update install, proceeding anyway");
+      }
 
       this.updater.quitAndInstall();
       this.emitDatadogEvent(

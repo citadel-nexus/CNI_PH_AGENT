@@ -31,6 +31,7 @@ export const AGENT_TOOLS: Set<string> = new Set([
   "Agent",
   "TodoWrite",
   "Skill",
+  "ScheduleWakeUp",
 ]);
 
 const BASE_ALLOWED_TOOLS = [

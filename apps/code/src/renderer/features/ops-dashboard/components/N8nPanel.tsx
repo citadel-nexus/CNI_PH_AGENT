@@ -42,6 +42,7 @@ export function N8nPanel() {
         <Text className="text-[12px] text-[--gray-10]">
           No recent executions
         </Text>
+        <Text className="text-[12px] text-[--gray-10]">No recent executions</Text>
       ) : (
         <Flex direction="column" gap="1">
           {executions.executions.map((ex) => (

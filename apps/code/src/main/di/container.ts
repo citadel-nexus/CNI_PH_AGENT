@@ -56,6 +56,7 @@ import { McpCallbackService } from "../services/mcp-callback/service";
 import { McpProxyService } from "../services/mcp-proxy/service";
 import { N8nIntegrationService } from "../services/n8n-integration/service";
 import { NewTaskLinkService } from "../services/new-task-link/service";
+import { N8nIntegrationService } from "../services/n8n-integration/service";
 import { NotificationService } from "../services/notification/service";
 import { OAuthService } from "../services/oauth/service";
 import { PosthogPluginService } from "../services/posthog-plugin/service";
@@ -70,6 +71,8 @@ import { TaskLinkService } from "../services/task-link/service";
 import { UIService } from "../services/ui/service";
 import { UpdatesService } from "../services/updates/service";
 import { UsageMonitorService } from "../services/usage-monitor/service";
+import { DatadogTelemetryService } from "../services/datadog-telemetry/service";
+import { N8nIntegrationService } from "../services/n8n-integration/service";
 import { PluginSyncService } from "../services/plugin-sync/service";
 import { WatcherRegistryService } from "../services/watcher-registry/service";
 import { WorkspaceService } from "../services/workspace/service";
@@ -153,11 +156,15 @@ container.bind(MAIN_TOKENS.SlackIntegrationService).to(SlackIntegrationService);
 container.bind(MAIN_TOKENS.UIService).to(UIService);
 container.bind(MAIN_TOKENS.UpdatesService).to(UpdatesService);
 container.bind(MAIN_TOKENS.UsageMonitorService).to(UsageMonitorService);
+container
+  .bind(MAIN_TOKENS.DatadogTelemetryService)
+  .to(DatadogTelemetryService);
 container.bind(MAIN_TOKENS.N8nIntegrationService).to(N8nIntegrationService);
 container.bind(MAIN_TOKENS.PluginSyncService).to(PluginSyncService);
 container.bind(MAIN_TOKENS.TaskLinkService).to(TaskLinkService);
 container.bind(MAIN_TOKENS.InboxLinkService).to(InboxLinkService);
 container.bind(MAIN_TOKENS.NewTaskLinkService).to(NewTaskLinkService);
+container.bind(MAIN_TOKENS.N8nIntegrationService).to(N8nIntegrationService);
 container.bind(MAIN_TOKENS.WatcherRegistryService).to(WatcherRegistryService);
 container.bind(MAIN_TOKENS.WorkspaceService).to(WorkspaceService);
 

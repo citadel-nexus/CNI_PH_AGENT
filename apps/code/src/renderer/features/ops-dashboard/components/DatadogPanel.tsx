@@ -40,6 +40,10 @@ export function DatadogPanel() {
             Agent
           </Text>
           <StatRow label="Sessions started" value={data.agent.sessionsStarted} />
+          <StatRow
+            label="Sessions started"
+            value={data.agent.sessionsStarted}
+          />
           <StatRow label="Sessions ended" value={data.agent.sessionsEnded} />
           <StatRow label="Session errors" value={data.agent.sessionErrors} />
           <StatRow label="LLM activity" value={data.agent.llmActivityCount} />
@@ -50,6 +54,18 @@ export function DatadogPanel() {
           <StatRow label="Checks initiated" value={data.updates.checksInitiated} />
           <StatRow label="Downloads started" value={data.updates.downloadsStarted} />
           <StatRow label="Installs initiated" value={data.updates.installsInitiated} />
+          <StatRow
+            label="Checks initiated"
+            value={data.updates.checksInitiated}
+          />
+          <StatRow
+            label="Downloads started"
+            value={data.updates.downloadsStarted}
+          />
+          <StatRow
+            label="Installs initiated"
+            value={data.updates.installsInitiated}
+          />
           <Text className="mb-1 mt-3 text-[11px] font-semibold uppercase text-[--gray-9]">
             Events
           </Text>

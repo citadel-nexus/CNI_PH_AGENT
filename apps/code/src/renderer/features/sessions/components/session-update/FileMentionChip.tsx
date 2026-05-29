@@ -1,8 +1,12 @@
 import { FileIcon } from "@components/ui/FileIcon";
+import { useCloudPrUrl } from "@features/git-interaction/hooks/useCloudPrUrl";
 import { usePanelLayoutStore } from "@features/panels";
 import { useSessionTaskId } from "@features/sessions/hooks/useSessionTaskId";
 import { useCwd } from "@features/sidebar/hooks/useCwd";
-import { useWorkspace } from "@features/workspace/hooks/useWorkspace";
+import {
+  useIsWorkspaceCloudRun,
+  useWorkspace,
+} from "@features/workspace/hooks/useWorkspace";
 import { Flex, Text } from "@radix-ui/themes";
 import { trpcClient } from "@renderer/trpc/client";
 import { handleExternalAppAction } from "@utils/handleExternalAppAction";
@@ -36,15 +40,22 @@ export const FileMentionChip = memo(function FileMentionChip({
   const repoPath = useCwd(taskId ?? "");
   const workspace = useWorkspace(taskId ?? undefined);
   const openFileInSplit = usePanelLayoutStore((s) => s.openFileInSplit);
+  const isCloudRun = useIsWorkspaceCloudRun(taskId ?? undefined);
+  const prUrl = useCloudPrUrl(taskId ?? "");
 
   const filename = getFilename(filePath);
   const mainRepoPath = workspace?.folderPath;
 
   const handleClick = useCallback(() => {
     if (!taskId) return;
+    if (isCloudRun) {
+      const url = prUrl ? `${prUrl}/files` : null;
+      if (url) void trpcClient.os.openExternal.mutate({ url });
+      return;
+    }
     const relativePath = toRelativePath(filePath, repoPath ?? null);
     openFileInSplit(taskId, relativePath, true);
-  }, [taskId, filePath, repoPath, openFileInSplit]);
+  }, [taskId, filePath, repoPath, openFileInSplit, isCloudRun, prUrl]);
 
   const handleContextMenu = useCallback(
     async (e: React.MouseEvent) => {
