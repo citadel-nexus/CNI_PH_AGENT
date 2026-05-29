@@ -9,6 +9,7 @@ import { logger } from "../../utils/logger";
 import { TypedEventEmitter } from "../../utils/typed-event-emitter";
 import { trackInDatadog } from "../datadog-telemetry/service";
 import type { AppLifecycleService } from "../app-lifecycle/service";
+import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import {
   type CheckForUpdatesOutput,
   type InstallUpdateOutput,
@@ -45,6 +46,9 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
 
   @inject(MAIN_TOKENS.MainWindow)
   private mainWindow!: IMainWindow;
+
+  @inject(MAIN_TOKENS.DatadogTelemetryService)
+  private datadogTelemetry!: DatadogTelemetryService;
 
   private updateReady = false;
   private pendingNotification = false;
@@ -97,14 +101,30 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   }
 
   checkForUpdates(source: CheckSource = "user"): CheckForUpdatesOutput {
+    this.emitDatadogEvent("Update check requested", "Checking for updates", {
+      source,
+    });
+
     if (!this.isEnabled) {
       const reason = isDevBuild()
         ? "Updates only available in packaged builds"
         : "Auto updates only supported on macOS and Windows";
+      this.emitDatadogEvent("Update check skipped", reason, {
+        source,
+        status: "disabled",
+      });
       return { success: false, errorMessage: reason, errorCode: "disabled" };
     }
 
     if (this.checkingForUpdates) {
+      this.emitDatadogEvent(
+        "Update check skipped",
+        "Update check already in progress",
+        {
+          source,
+          status: "already_checking",
+        },
+      );
       return {
         success: false,
         errorMessage: "Already checking for updates",
@@ -138,6 +158,13 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   async installUpdate(): Promise<InstallUpdateOutput> {
     if (!this.updateReady) {
       log.warn("installUpdate called but no update is ready");
+      this.emitDatadogEvent(
+        "Update install skipped",
+        "No update was available to install",
+        {
+          status: "skipped",
+        },
+      );
       return { installed: false };
     }
 
@@ -156,9 +183,25 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
       await this.lifecycleService.shutdownWithoutContainer();
 
       this.updater.quitAndInstall();
+      this.emitDatadogEvent(
+        "Update install triggered",
+        "Updater quitAndInstall invoked",
+        {
+          status: "triggered",
+          version: this.downloadedVersion ?? "unknown",
+        },
+      );
       return { installed: true };
     } catch (error) {
       log.error("Failed to quit and install update", error);
+      this.emitDatadogEvent(
+        "Update install failed",
+        error instanceof Error ? error.message : String(error),
+        {
+          status: "failed",
+          version: this.downloadedVersion ?? "unknown",
+        },
+      );
       return { installed: false };
     }
   }
@@ -221,6 +264,9 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
         error: error.message,
       });
     }
+    this.emitDatadogEvent("Update error", error.message, {
+      status: "error",
+    });
   }
 
   private handleCheckingForUpdate(): void {
@@ -230,6 +276,13 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   private handleUpdateAvailable(): void {
     this.clearCheckTimeout();
     log.info("Update available, downloading...");
+    this.emitDatadogEvent(
+      "Update available",
+      "Update available and download started",
+      {
+        status: "downloading",
+      },
+    );
     // Keep checkingForUpdates true while downloading
     this.emitStatus({ checking: true, downloading: true });
   }
@@ -237,6 +290,14 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   private handleNoUpdate(): void {
     this.clearCheckTimeout();
     log.info("No updates available", { currentVersion: this.appMeta.version });
+    this.emitDatadogEvent(
+      "No update available",
+      "Current version is up to date",
+      {
+        status: "up_to_date",
+        version: this.appMeta.version,
+      },
+    );
     if (this.checkingForUpdates) {
       this.checkingForUpdates = false;
 
@@ -270,6 +331,14 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
     });
 
     this.updateReady = true;
+    this.emitDatadogEvent(
+      "Update downloaded",
+      "Update downloaded and waiting for install",
+      {
+        status: "ready",
+        version: this.downloadedVersion ?? "unknown",
+      },
+    );
 
     // Only show notification if this is a different version than already notified
     if (this.notifiedVersion !== this.downloadedVersion) {
@@ -305,6 +374,13 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
     this.checkTimeoutId = setTimeout(() => {
       if (this.checkingForUpdates) {
         log.warn("Update check timed out after 60 seconds");
+        this.emitDatadogEvent(
+          "Update check timed out",
+          "Update check timed out after 60 seconds",
+          {
+            status: "timeout",
+          },
+        );
         this.checkingForUpdates = false;
         this.emitStatus({
           checking: false,
@@ -331,6 +407,17 @@ export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
       clearTimeout(this.checkTimeoutId);
       this.checkTimeoutId = null;
     }
+  }
+
+  private emitDatadogEvent(
+    title: string,
+    text: string,
+    tags: Record<string, string | number | boolean> = {},
+  ): void {
+    void this.datadogTelemetry.trackEvent(title, text, {
+      component: "updates",
+      ...tags,
+    });
   }
 
   @preDestroy()

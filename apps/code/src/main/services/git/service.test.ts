@@ -24,6 +24,7 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 import type { AgentService } from "../agent/service";
+import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import type { LlmGatewayService } from "../llm-gateway/service";
 import type { WorkspaceService } from "../workspace/service";
 import { GitService, mapPrState } from "./service";
@@ -37,6 +38,7 @@ describe("GitService.getPrChangedFiles", () => {
       {} as LlmGatewayService,
       {} as WorkspaceService,
       { getSessionEnvForTask: async () => ({}) } as unknown as AgentService,
+      {} as DatadogTelemetryService,
     );
   });
 
@@ -149,6 +151,7 @@ describe("GitService.getGhAuthToken", () => {
       {} as LlmGatewayService,
       {} as WorkspaceService,
       { getSessionEnvForTask: async () => ({}) } as unknown as AgentService,
+      {} as DatadogTelemetryService,
     );
   });
 
@@ -211,6 +214,7 @@ describe("GitService.getPrUrlForBranch", () => {
       {} as LlmGatewayService,
       {} as WorkspaceService,
       { getSessionEnvForTask: async () => ({}) } as unknown as AgentService,
+      {} as DatadogTelemetryService,
     );
   });
 
@@ -329,6 +333,7 @@ describe("GitService.getPrReviewComments", () => {
       {} as LlmGatewayService,
       {} as WorkspaceService,
       { getSessionEnvForTask: async () => ({}) } as unknown as AgentService,
+      {} as DatadogTelemetryService,
     );
   });
 
@@ -487,6 +492,7 @@ describe("GitService.resolveReviewThread", () => {
       {} as LlmGatewayService,
       {} as WorkspaceService,
       { getSessionEnvForTask: async () => ({}) } as unknown as AgentService,
+      {} as DatadogTelemetryService,
     );
   });
 

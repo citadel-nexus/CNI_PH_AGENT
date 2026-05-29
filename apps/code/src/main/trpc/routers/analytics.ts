@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  getRecentTrackedEvents,
   getRecentEvents,
   identifyUser,
   resetUser,
@@ -8,6 +9,12 @@ import {
 import { publicProcedure, router } from "../trpc";
 
 const recentEventSchema = z.object({
+  eventName: z.string(),
+  timestamp: z.string(),
+  properties: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean()]),
+  ),
   name: z.string(),
   timestamp: z.string(),
   properties: z
@@ -40,6 +47,15 @@ export const analyticsRouter = router({
   }),
 
   getRecentEvents: publicProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(50).optional(),
+        })
+        .optional(),
+    )
+    .output(z.array(recentEventSchema))
+    .query(({ input }) => getRecentTrackedEvents(input?.limit ?? 20)),
     .output(z.array(recentEventSchema))
     .query(() => getRecentEvents()),
 });
