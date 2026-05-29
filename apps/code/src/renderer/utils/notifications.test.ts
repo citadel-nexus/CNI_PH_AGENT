@@ -78,9 +78,27 @@ describe("notifications", () => {
       shouldNotify: boolean;
     }> = [
       {
-        name: "window unfocused → notifies",
+        name: "window unfocused, viewing the same task → does not notify",
         focused: false,
         view: { type: "task-detail", data: { id: TASK_ID }, taskId: TASK_ID },
+        taskId: TASK_ID,
+        shouldNotify: false,
+      },
+      {
+        name: "window unfocused, viewing a different task → notifies",
+        focused: false,
+        view: {
+          type: "task-detail",
+          data: { id: OTHER_TASK_ID },
+          taskId: OTHER_TASK_ID,
+        },
+        taskId: TASK_ID,
+        shouldNotify: true,
+      },
+      {
+        name: "window unfocused, not on task detail → notifies",
+        focused: false,
+        view: { type: "inbox" },
         taskId: TASK_ID,
         shouldNotify: true,
       },
