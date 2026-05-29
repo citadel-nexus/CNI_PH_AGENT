@@ -23,7 +23,7 @@ export const endSpanInput = z.object({
   spanId: z.string(),
 });
 
-export const metricInput = z.object({
+const metricInput = z.object({
   name: z.string().min(1),
   tags: telemetryTagsSchema,
 });
@@ -56,42 +56,6 @@ export const datadogDashboardStatusOutput = z.object({
   lastEventAt: z.string().nullable(),
 });
 
-export type TelemetryTags = z.infer<typeof telemetryTagsSchema>;
-export type StartSpanInput = z.infer<typeof startSpanInput>;
-export type StartSpanOutput = z.infer<typeof startSpanOutput>;
-export type EndSpanInput = z.infer<typeof endSpanInput>;
-export type IncrementMetricInput = z.infer<typeof incrementMetricInput>;
-export type GaugeInput = z.infer<typeof gaugeInput>;
-export type HistogramInput = z.infer<typeof histogramInput>;
-export type TrackEventInput = z.infer<typeof trackEventInput>;
-export type DatadogDashboardStatusOutput = z.infer<
-  typeof datadogDashboardStatusOutput
->;
-export const metricTagsSchema = z.record(z.string(), z.string()).optional();
-
-export const incrementMetricInput = z.object({
-  name: z.string(),
-  tags: metricTagsSchema,
-});
-
-export const gaugeMetricInput = z.object({
-  name: z.string(),
-  value: z.number(),
-  tags: metricTagsSchema,
-});
-
-export const histogramMetricInput = z.object({
-  name: z.string(),
-  value: z.number(),
-  tags: metricTagsSchema,
-});
-
-export const trackEventInput = z.object({
-  title: z.string(),
-  text: z.string(),
-  tags: z.array(z.string()).optional(),
-});
-
 export const agentMetricSchema = z.object({
   sessionsStarted: z.number(),
   sessionsEnded: z.number(),
@@ -107,15 +71,38 @@ export const updateMetricSchema = z.object({
   installsInitiated: z.number(),
 });
 
+export const cbfMetricSchema = z.object({
+  blueprintRefreshes: z.number(),
+  blueprintSelections: z.number(),
+  growthCycles: z.number(),
+  domainCoverageScore: z.number().nullable(),
+  buildsStarted: z.number(),
+  buildsCompleted: z.number(),
+  buildFailures: z.number(),
+  buildIterations: z.number(),
+  lastBuildDurationMs: z.number().nullable(),
+  sessionsStarted: z.number(),
+  sessionsEnded: z.number(),
+  sessionFailures: z.number(),
+});
+
 export const telemetryStatsOutput = z.object({
   agent: agentMetricSchema,
   updates: updateMetricSchema,
+  cbf: cbfMetricSchema,
   eventsEmitted: z.number(),
   statsdEnabled: z.boolean(),
 });
 
-export type TelemetryStatsOutput = z.infer<typeof telemetryStatsOutput>;
+export type TelemetryTags = z.infer<typeof telemetryTagsSchema>;
+export type StartSpanInput = z.infer<typeof startSpanInput>;
+export type StartSpanOutput = z.infer<typeof startSpanOutput>;
+export type EndSpanInput = z.infer<typeof endSpanInput>;
 export type IncrementMetricInput = z.infer<typeof incrementMetricInput>;
-export type GaugeMetricInput = z.infer<typeof gaugeMetricInput>;
-export type HistogramMetricInput = z.infer<typeof histogramMetricInput>;
+export type GaugeInput = z.infer<typeof gaugeInput>;
+export type HistogramInput = z.infer<typeof histogramInput>;
 export type TrackEventInput = z.infer<typeof trackEventInput>;
+export type DatadogDashboardStatusOutput = z.infer<
+  typeof datadogDashboardStatusOutput
+>;
+export type TelemetryStatsOutput = z.infer<typeof telemetryStatsOutput>;

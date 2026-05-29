@@ -21,6 +21,7 @@ import {
 const log = logger.scope("plugin-sync");
 
 const MAX_HISTORY = 50;
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 interface GitHubCommit {
   sha: string;
@@ -40,6 +41,16 @@ interface GitHubTree {
 interface InstalledPluginsFile {
   version: number;
   plugins: Record<string, Array<{ scope: string; installPath: string; version: string }>>;
+}
+
+class GitHubHttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    body: string,
+  ) {
+    super(`GitHub API ${statusCode}: ${body.slice(0, 200)}`);
+    this.name = "GitHubHttpError";
+  }
 }
 
 function httpsGet(url: string, token?: string): Promise<string> {
@@ -62,7 +73,7 @@ function httpsGet(url: string, token?: string): Promise<string> {
       res.on("end", () => {
         const body = Buffer.concat(chunks).toString("utf-8");
         if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`GitHub API ${res.statusCode}: ${body.slice(0, 200)}`));
+          reject(new GitHubHttpError(res.statusCode, body));
           return;
         }
         resolve(body);
@@ -74,6 +85,57 @@ function httpsGet(url: string, token?: string): Promise<string> {
     });
     req.end();
   });
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof GitHubHttpError) {
+    return error.statusCode >= 500;
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes("timed out") ||
+      message.includes("network") ||
+      message.includes("socket hang up") ||
+      message.includes("econnreset") ||
+      message.includes("eai_again") ||
+      message.includes("enotfound")
+    );
+  }
+
+  return false;
+}
+
+async function httpsGetWithRetry(url: string, token?: string): Promise<string> {
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await httpsGet(url, token);
+    } catch (error) {
+      const shouldRetry =
+        attempt < RETRY_DELAYS_MS.length && isRetryableError(error);
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      const delayMs = RETRY_DELAYS_MS[attempt];
+      log.warn("GitHub request failed, retrying", {
+        url,
+        attempt: attempt + 1,
+        delayMs,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await wait(delayMs);
+    }
+  }
+
+  throw new Error("Retry loop exited unexpectedly");
 }
 
 @injectable()
@@ -297,7 +359,7 @@ export class PluginSyncService extends TypedEventEmitter<PluginSyncEvents> {
   private async fetchLatestCommitSha(owner: string, repo: string): Promise<string> {
     const pathFilter = this.config.paths[0] ?? "plugins/citadel";
     const url = `https://api.github.com/repos/${owner}/${repo}/commits?path=${encodeURIComponent(pathFilter)}&sha=${encodeURIComponent(this.config.branch)}&per_page=1`;
-    const body = await httpsGet(url, this.token);
+    const body = await httpsGetWithRetry(url, this.token);
     const commits = JSON.parse(body) as GitHubCommit[];
     if (!commits.length) throw new Error("No commits found for path");
     return commits[0].sha;
@@ -305,7 +367,7 @@ export class PluginSyncService extends TypedEventEmitter<PluginSyncEvents> {
 
   private async syncFiles(owner: string, repo: string, sha: string): Promise<string[]> {
     const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${sha}?recursive=1`;
-    const body = await httpsGet(treeUrl, this.token);
+    const body = await httpsGetWithRetry(treeUrl, this.token);
     const tree = JSON.parse(body) as GitHubTree;
 
     const targetPaths = this.config.paths;
@@ -324,7 +386,7 @@ export class PluginSyncService extends TypedEventEmitter<PluginSyncEvents> {
       blobs.map(async (item) => {
         const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${item.path}`;
         try {
-          const content = await httpsGet(rawUrl, this.token);
+          const content = await httpsGetWithRetry(rawUrl, this.token);
           const localPath = path.join(this.syncDir, item.path);
           fs.mkdirSync(path.dirname(localPath), { recursive: true });
           const tmpPath = localPath + ".tmp";

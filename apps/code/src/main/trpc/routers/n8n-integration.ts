@@ -4,9 +4,6 @@ import {
   n8nErrorCountOutput,
   n8nRecentExecutionsOutput,
   n8nWorkflowsOutput,
-  getRecentExecutionsInput,
-  getRecentExecutionsOutput,
-  getWorkflowsOutput,
 } from "../../services/n8n-integration/schemas";
 import type { N8nIntegrationService } from "../../services/n8n-integration/service";
 import { publicProcedure, router } from "../trpc";
@@ -18,17 +15,13 @@ export const n8nIntegrationRouter = router({
   getWorkflows: publicProcedure
     .output(n8nWorkflowsOutput)
     .query(() => getService().getWorkflows()),
+
   getRecentExecutions: publicProcedure
     .output(n8nRecentExecutionsOutput)
     .query(() => getService().getRecentExecutions()),
+
   getErrorCount: publicProcedure.output(n8nErrorCountOutput).query(async () => {
     const count = await getService().getErrorCount();
     return { count };
   }),
-    .output(getWorkflowsOutput)
-    .query(() => getService().getWorkflows()),
-  getRecentExecutions: publicProcedure
-    .input(getRecentExecutionsInput)
-    .output(getRecentExecutionsOutput)
-    .query(({ input }) => getService().getRecentExecutions(input.limit)),
 });
