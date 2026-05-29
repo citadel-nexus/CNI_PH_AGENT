@@ -39,6 +39,9 @@ export function N8nPanel() {
       {isLoading || !executions ? (
         <Text className="text-[12px] text-[--gray-10]">Loading…</Text>
       ) : executions.executions.length === 0 ? (
+        <Text className="text-[12px] text-[--gray-10]">
+          No recent executions
+        </Text>
         <Text className="text-[12px] text-[--gray-10]">No recent executions</Text>
       ) : (
         <Flex direction="column" gap="1">

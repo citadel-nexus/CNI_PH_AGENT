@@ -53,6 +53,7 @@ export function LinearPanel() {
               {status.activeCycle.issueCount}
             </Text>
           </Flex>
+          <Progress value={status.activeCycle.percentComplete} size="1" />
           <Progress
             value={status.activeCycle.percentComplete}
             size="1"
@@ -81,6 +82,7 @@ export function LinearPanel() {
               justify="between"
               className="gap-2 border-b border-[--gray-a3] py-1 last:border-0"
             >
+              <Text className="min-w-0 truncate text-[11px]">{issue.title}</Text>
               <Text className="min-w-0 truncate text-[11px]">
                 {issue.title}
               </Text>

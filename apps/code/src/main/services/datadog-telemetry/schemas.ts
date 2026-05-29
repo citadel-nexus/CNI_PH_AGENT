@@ -115,3 +115,7 @@ export const telemetryStatsOutput = z.object({
 });
 
 export type TelemetryStatsOutput = z.infer<typeof telemetryStatsOutput>;
+export type IncrementMetricInput = z.infer<typeof incrementMetricInput>;
+export type GaugeMetricInput = z.infer<typeof gaugeMetricInput>;
+export type HistogramMetricInput = z.infer<typeof histogramMetricInput>;
+export type TrackEventInput = z.infer<typeof trackEventInput>;

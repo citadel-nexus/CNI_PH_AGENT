@@ -40,6 +40,7 @@ import { suspensionRouter } from "./routers/suspension.js";
 import { uiRouter } from "./routers/ui";
 import { updatesRouter } from "./routers/updates";
 import { usageMonitorRouter } from "./routers/usage-monitor";
+import { pluginSyncRouter } from "./routers/plugin-sync";
 import { workspaceRouter } from "./routers/workspace";
 import { router } from "./trpc";
 
@@ -86,6 +87,7 @@ export const trpcRouter = router({
   ui: uiRouter,
   updates: updatesRouter,
   usageMonitor: usageMonitorRouter,
+  pluginSync: pluginSyncRouter,
   deepLink: deepLinkRouter,
   workspace: workspaceRouter,
 });

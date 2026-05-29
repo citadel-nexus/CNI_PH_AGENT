@@ -39,6 +39,7 @@ export function DatadogPanel() {
           <Text className="mb-1 text-[11px] font-semibold uppercase text-[--gray-9]">
             Agent
           </Text>
+          <StatRow label="Sessions started" value={data.agent.sessionsStarted} />
           <StatRow
             label="Sessions started"
             value={data.agent.sessionsStarted}
@@ -50,6 +51,9 @@ export function DatadogPanel() {
           <Text className="mb-1 mt-3 text-[11px] font-semibold uppercase text-[--gray-9]">
             Updates
           </Text>
+          <StatRow label="Checks initiated" value={data.updates.checksInitiated} />
+          <StatRow label="Downloads started" value={data.updates.downloadsStarted} />
+          <StatRow label="Installs initiated" value={data.updates.installsInitiated} />
           <StatRow
             label="Checks initiated"
             value={data.updates.checksInitiated}

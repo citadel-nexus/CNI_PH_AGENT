@@ -1,6 +1,9 @@
 import { container } from "../../di/container";
 import { MAIN_TOKENS } from "../../di/tokens";
 import {
+  telemetryStatsOutput,
+  trackEventInput,
+} from "../../services/datadog-telemetry/schemas";
   datadogDashboardStatusOutput,
   endSpanInput,
   gaugeInput,
@@ -19,6 +22,15 @@ const getService = () =>
   container.get<DatadogTelemetryService>(MAIN_TOKENS.DatadogTelemetryService);
 
 export const datadogTelemetryRouter = router({
+  getStats: publicProcedure
+    .output(telemetryStatsOutput)
+    .query(() => getService().getStats()),
+
+  trackEvent: publicProcedure
+    .input(trackEventInput)
+    .mutation(({ input }) => {
+      getService().trackEvent(input.title, input.text, input.tags);
+    }),
   startSpan: publicProcedure
     .input(startSpanInput)
     .output(startSpanOutput)
