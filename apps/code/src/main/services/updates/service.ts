@@ -23,8 +23,8 @@ const log = logger.scope("updates");
 @injectable()
 export class UpdatesService extends TypedEventEmitter<UpdatesEvents> {
   private static readonly SERVER_HOST = "https://update.electronjs.org";
-  private static readonly REPO_OWNER = "PostHog";
-  private static readonly REPO_NAME = "code";
+  private static readonly REPO_OWNER = "citadel-nexus";
+  private static readonly REPO_NAME = "CNI_PH_AGENT";
   private static readonly CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
   private static readonly CHECK_TIMEOUT_MS = 60 * 1000; // 1 minute timeout for checks
   private static readonly DISABLE_ENV_FLAG = "ELECTRON_DISABLE_AUTO_UPDATE";
