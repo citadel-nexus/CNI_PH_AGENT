@@ -185,6 +185,38 @@ async function buildSyntheticPlugin(
   }
 }
 
+export interface PluginRefreshDiff {
+  added: string[];
+  removed: string[];
+  changed: string[];
+}
+
+let previousPluginPaths: Set<string> = new Set();
+
+export async function refreshPlugins(
+  options: DiscoverPluginsOptions,
+): Promise<{ plugins: SdkPluginConfig[]; diff: PluginRefreshDiff }> {
+  const plugins = await discoverExternalPlugins(options);
+  const current = new Set(
+    plugins.map((p) => ("path" in p ? String(p.path) : JSON.stringify(p))),
+  );
+
+  const added = [...current].filter((p) => !previousPluginPaths.has(p));
+  const removed = [...previousPluginPaths].filter((p) => !current.has(p));
+
+  const diff: PluginRefreshDiff = { added, removed, changed: [] };
+  previousPluginPaths = current;
+
+  if (added.length > 0 || removed.length > 0) {
+    log.info("Plugin registry updated", {
+      added: added.length,
+      removed: removed.length,
+    });
+  }
+
+  return { plugins, diff };
+}
+
 export async function readSkillMetadataFromDir(
   skillsDir: string,
   source: SkillSource,

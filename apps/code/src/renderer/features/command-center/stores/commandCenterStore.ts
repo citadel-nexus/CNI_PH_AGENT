@@ -3,6 +3,63 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type LayoutPreset = "1x1" | "2x1" | "1x2" | "2x2" | "3x2" | "3x3";
+export type CommandCenterPanelId = "datadog" | "posthog" | "linear" | "n8n";
+
+export interface DatadogPanelSnapshot {
+  activeAlerts: number;
+  errorRate: number;
+  apmHealthy: boolean;
+  recentEventCount: number;
+  lastEventAt: string | null;
+}
+
+export interface PosthogPanelEvent {
+  eventName: string;
+  timestamp: string;
+}
+
+export interface PosthogPanelSnapshot {
+  recentEvents: PosthogPanelEvent[];
+}
+
+export interface LinearPanelIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  state: string | null;
+}
+
+export interface LinearPanelSnapshot {
+  activeIssues: LinearPanelIssue[];
+  projectStatus: Array<{
+    id: string;
+    name: string;
+    progress: number | null;
+    state: string | null;
+  }>;
+  recentUpdates: Array<{
+    id: string;
+    identifier: string;
+    title: string;
+    updatedAt: string | null;
+  }>;
+}
+
+export interface N8nPanelSnapshot {
+  workflows: Array<{
+    id: string;
+    name: string;
+    active: boolean;
+    updatedAt: string | null;
+  }>;
+  recentExecutions: Array<{
+    id: string;
+    status: string;
+    startedAt: string | null;
+    stoppedAt: string | null;
+  }>;
+  errorCount: number;
+}
 
 interface GridDimensions {
   cols: number;
@@ -26,6 +83,13 @@ interface CommandCenterStoreState {
   activeCellIndex: number | null;
   zoom: number;
   creatingCells: number[];
+  panelVisibility: Record<CommandCenterPanelId, boolean>;
+  panelOrder: CommandCenterPanelId[];
+  lastRefreshAt: string | null;
+  datadogSnapshot: DatadogPanelSnapshot;
+  posthogSnapshot: PosthogPanelSnapshot;
+  linearSnapshot: LinearPanelSnapshot;
+  n8nSnapshot: N8nPanelSnapshot;
 }
 
 interface CommandCenterStoreActions {
@@ -42,6 +106,13 @@ interface CommandCenterStoreActions {
   zoomOut: () => void;
   startCreating: (cellIndex: number) => void;
   stopCreating: (cellIndex: number) => void;
+  setPanelVisibility: (panelId: CommandCenterPanelId, visible: boolean) => void;
+  setPanelOrder: (panelOrder: CommandCenterPanelId[]) => void;
+  setLastRefreshAt: (timestamp: string | null) => void;
+  setDatadogSnapshot: (snapshot: DatadogPanelSnapshot) => void;
+  setPosthogSnapshot: (snapshot: PosthogPanelSnapshot) => void;
+  setLinearSnapshot: (snapshot: LinearPanelSnapshot) => void;
+  setN8nSnapshot: (snapshot: N8nPanelSnapshot) => void;
 }
 
 export const COMMAND_CENTER_INITIAL_STATE: CommandCenterStoreState = {
@@ -51,6 +122,34 @@ export const COMMAND_CENTER_INITIAL_STATE: CommandCenterStoreState = {
   activeCellIndex: null,
   zoom: 1,
   creatingCells: [],
+  panelVisibility: {
+    datadog: true,
+    posthog: true,
+    linear: true,
+    n8n: true,
+  },
+  panelOrder: ["datadog", "posthog", "linear", "n8n"],
+  lastRefreshAt: null,
+  datadogSnapshot: {
+    activeAlerts: 0,
+    errorRate: 0,
+    apmHealthy: true,
+    recentEventCount: 0,
+    lastEventAt: null,
+  },
+  posthogSnapshot: {
+    recentEvents: [],
+  },
+  linearSnapshot: {
+    activeIssues: [],
+    projectStatus: [],
+    recentUpdates: [],
+  },
+  n8nSnapshot: {
+    workflows: [],
+    recentExecutions: [],
+    errorCount: 0,
+  },
 };
 
 type CommandCenterStore = CommandCenterStoreState & CommandCenterStoreActions;
@@ -186,6 +285,23 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
         set((state) => ({
           creatingCells: state.creatingCells.filter((i) => i !== cellIndex),
         })),
+
+      setPanelVisibility: (panelId, visible) =>
+        set((state) => ({
+          panelVisibility: {
+            ...state.panelVisibility,
+            [panelId]: visible,
+          },
+        })),
+
+      setPanelOrder: (panelOrder) => set({ panelOrder }),
+
+      setLastRefreshAt: (timestamp) => set({ lastRefreshAt: timestamp }),
+
+      setDatadogSnapshot: (snapshot) => set({ datadogSnapshot: snapshot }),
+      setPosthogSnapshot: (snapshot) => set({ posthogSnapshot: snapshot }),
+      setLinearSnapshot: (snapshot) => set({ linearSnapshot: snapshot }),
+      setN8nSnapshot: (snapshot) => set({ n8nSnapshot: snapshot }),
     }),
     {
       name: "command-center-storage",
@@ -197,6 +313,8 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
         activeCellIndex: state.activeCellIndex,
         zoom: state.zoom,
         creatingCells: state.creatingCells,
+        panelVisibility: state.panelVisibility,
+        panelOrder: state.panelOrder,
       }),
     },
   ),

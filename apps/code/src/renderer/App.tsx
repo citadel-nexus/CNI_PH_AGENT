@@ -13,6 +13,8 @@ import {
 import { useAuthSession } from "@features/auth/hooks/useAuthSession";
 import { useIsOrgAdmin } from "@features/auth/hooks/useOrgRole";
 import { registerBillingSubscriptions } from "@features/billing/subscriptions";
+import { registerPluginSyncSubscriptions } from "@features/plugin-sync/subscriptions";
+import { registerCommandCenterSubscriptions } from "@features/command-center/subscriptions";
 import { AddDirectoryDialog } from "@features/folder-picker/components/AddDirectoryDialog";
 import { OnboardingFlow } from "@features/onboarding/components/OnboardingFlow";
 import { useOnboardingStore } from "@features/onboarding/stores/onboardingStore";
@@ -75,9 +77,18 @@ function App() {
     return registerBillingSubscriptions();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    return registerCommandCenterSubscriptions();
+  }, [isAuthenticated]);
+
   // Initialize update store
   useEffect(() => {
     return initializeUpdateStore();
+  }, []);
+
+  useEffect(() => {
+    return registerPluginSyncSubscriptions();
   }, []);
 
   // Dev-only inbox demo command for local QA from the renderer console.

@@ -6,6 +6,7 @@ import { authRouter } from "./routers/auth";
 import { cloudTaskRouter } from "./routers/cloud-task";
 import { connectivityRouter } from "./routers/connectivity";
 import { contextMenuRouter } from "./routers/context-menu";
+import { datadogTelemetryRouter } from "./routers/datadog-telemetry";
 import { deepLinkRouter } from "./routers/deep-link";
 import { encryptionRouter } from "./routers/encryption";
 import { enrichmentRouter } from "./routers/enrichment";
@@ -23,6 +24,7 @@ import { llmGatewayRouter } from "./routers/llm-gateway";
 import { logsRouter } from "./routers/logs";
 import { mcpAppsRouter } from "./routers/mcp-apps";
 import { mcpCallbackRouter } from "./routers/mcp-callback";
+import { n8nIntegrationRouter } from "./routers/n8n-integration";
 import { notificationRouter } from "./routers/notification";
 import { oauthRouter } from "./routers/oauth";
 import { osRouter } from "./routers/os";
@@ -37,6 +39,7 @@ import { suspensionRouter } from "./routers/suspension.js";
 import { uiRouter } from "./routers/ui";
 import { updatesRouter } from "./routers/updates";
 import { usageMonitorRouter } from "./routers/usage-monitor";
+import { pluginSyncRouter } from "./routers/plugin-sync";
 import { workspaceRouter } from "./routers/workspace";
 import { router } from "./trpc";
 
@@ -49,6 +52,7 @@ export const trpcRouter = router({
   cloudTask: cloudTaskRouter,
   connectivity: connectivityRouter,
   contextMenu: contextMenuRouter,
+  datadogTelemetry: datadogTelemetryRouter,
 
   enrichment: enrichmentRouter,
   environment: environmentRouter,
@@ -65,6 +69,7 @@ export const trpcRouter = router({
   llmGateway: llmGatewayRouter,
   mcpApps: mcpAppsRouter,
   mcpCallback: mcpCallbackRouter,
+  n8nIntegration: n8nIntegrationRouter,
   notification: notificationRouter,
   oauth: oauthRouter,
   logs: logsRouter,
@@ -80,6 +85,7 @@ export const trpcRouter = router({
   ui: uiRouter,
   updates: updatesRouter,
   usageMonitor: usageMonitorRouter,
+  pluginSync: pluginSyncRouter,
   deepLink: deepLinkRouter,
   workspace: workspaceRouter,
 });
