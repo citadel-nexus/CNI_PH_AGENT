@@ -1,8 +1,19 @@
 import { PostHog } from "posthog-node";
 import { getAppVersion } from "../utils/env";
+import { trackInDatadog } from "./datadog-telemetry/service";
 
 let posthogClient: PostHog | null = null;
 let currentUserId: string | null = null;
+
+const MAX_RECENT_EVENTS = 50;
+
+export interface RecentEvent {
+  name: string;
+  timestamp: string;
+  properties?: Record<string, string | number | boolean>;
+}
+
+const recentEvents: RecentEvent[] = [];
 
 export function initializePostHog() {
   if (posthogClient) {
@@ -52,6 +63,21 @@ export function trackAppEvent(
       $process_person_profile: !!currentUserId,
     },
   });
+
+  trackInDatadog(eventName, properties);
+
+  recentEvents.unshift({
+    name: eventName,
+    timestamp: new Date().toISOString(),
+    properties,
+  });
+  if (recentEvents.length > MAX_RECENT_EVENTS) {
+    recentEvents.splice(MAX_RECENT_EVENTS);
+  }
+}
+
+export function getRecentEvents(): RecentEvent[] {
+  return recentEvents.slice();
 }
 
 export function identifyUser(

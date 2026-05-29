@@ -1,15 +1,21 @@
 import { z } from "zod";
 import {
+  getRecentEvents,
   identifyUser,
   resetUser,
   setCurrentUserId,
 } from "../../services/posthog-analytics";
 import { publicProcedure, router } from "../trpc";
 
+const recentEventSchema = z.object({
+  name: z.string(),
+  timestamp: z.string(),
+  properties: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional(),
+});
+
 export const analyticsRouter = router({
-  /**
-   * Set the current user ID for main process analytics
-   */
   setUserId: publicProcedure
     .input(
       z.object({
@@ -29,10 +35,11 @@ export const analyticsRouter = router({
       }
     }),
 
-  /**
-   * Reset the current user (on logout)
-   */
   resetUser: publicProcedure.mutation(() => {
     resetUser();
   }),
+
+  getRecentEvents: publicProcedure
+    .output(z.array(recentEventSchema))
+    .query(() => getRecentEvents()),
 });

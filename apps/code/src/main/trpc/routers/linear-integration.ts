@@ -1,6 +1,8 @@
 import { container } from "../../di/container.js";
 import { MAIN_TOKENS } from "../../di/tokens.js";
 import {
+  getActiveIssuesOutput,
+  getProjectStatusOutput,
   startLinearFlowInput,
   startLinearFlowOutput,
 } from "../../services/linear-integration/schemas.js";
@@ -17,4 +19,11 @@ export const linearIntegrationRouter = router({
     .mutation(({ input }) =>
       getService().startFlow(input.region, input.projectId),
     ),
+  getActiveIssues: publicProcedure
+    .output(getActiveIssuesOutput)
+    .query(() => getService().getActiveIssues()),
+  getProjectStatus: publicProcedure
+    .output(getProjectStatusOutput)
+    .query(() => getService().getProjectStatus()),
 });
+
