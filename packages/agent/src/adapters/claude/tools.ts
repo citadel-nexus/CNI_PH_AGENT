@@ -33,6 +33,8 @@ export const AGENT_TOOLS: Set<string> = new Set([
   "TaskUpdate",
   "TaskGet",
   "TaskList",
+  "TodoWrite",
+  "Skill",
   "ScheduleWakeUp",
 ]);
 

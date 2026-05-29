@@ -15,6 +15,8 @@ import { useIsOrgAdmin } from "@features/auth/hooks/useOrgRole";
 import { registerBillingSubscriptions } from "@features/billing/subscriptions";
 import { registerCommandCenterSubscriptions } from "@features/command-center/subscriptions";
 import { registerPluginSyncSubscriptions } from "@features/plugin-sync/subscriptions";
+import { registerPluginSyncSubscriptions } from "@features/plugin-sync/subscriptions";
+import { registerCommandCenterSubscriptions } from "@features/command-center/subscriptions";
 import { AddDirectoryDialog } from "@features/folder-picker/components/AddDirectoryDialog";
 import { OnboardingFlow } from "@features/onboarding/components/OnboardingFlow";
 import { useOnboardingStore } from "@features/onboarding/stores/onboardingStore";
