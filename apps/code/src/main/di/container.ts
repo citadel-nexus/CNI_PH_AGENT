@@ -34,6 +34,7 @@ import { AuthProxyService } from "../services/auth-proxy/service";
 import { CloudTaskService } from "../services/cloud-task/service";
 import { ConnectivityService } from "../services/connectivity/service";
 import { ContextMenuService } from "../services/context-menu/service";
+import { DatadogTelemetryService } from "../services/datadog-telemetry/service";
 import { DeepLinkService } from "../services/deep-link/service";
 import { EnrichmentService } from "../services/enrichment/service";
 import { EnvironmentService } from "../services/environment/service";
@@ -53,6 +54,7 @@ import { LocalLogsService } from "../services/local-logs/service";
 import { McpAppsService } from "../services/mcp-apps/service";
 import { McpCallbackService } from "../services/mcp-callback/service";
 import { McpProxyService } from "../services/mcp-proxy/service";
+import { N8nIntegrationService } from "../services/n8n-integration/service";
 import { NewTaskLinkService } from "../services/new-task-link/service";
 import { NotificationService } from "../services/notification/service";
 import { OAuthService } from "../services/oauth/service";
@@ -149,6 +151,10 @@ container.bind(MAIN_TOKENS.SlackIntegrationService).to(SlackIntegrationService);
 container.bind(MAIN_TOKENS.UIService).to(UIService);
 container.bind(MAIN_TOKENS.UpdatesService).to(UpdatesService);
 container.bind(MAIN_TOKENS.UsageMonitorService).to(UsageMonitorService);
+container
+  .bind(MAIN_TOKENS.DatadogTelemetryService)
+  .to(DatadogTelemetryService);
+container.bind(MAIN_TOKENS.N8nIntegrationService).to(N8nIntegrationService);
 container.bind(MAIN_TOKENS.TaskLinkService).to(TaskLinkService);
 container.bind(MAIN_TOKENS.InboxLinkService).to(InboxLinkService);
 container.bind(MAIN_TOKENS.NewTaskLinkService).to(NewTaskLinkService);
