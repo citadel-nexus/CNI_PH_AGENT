@@ -1,5 +1,6 @@
 import { useSignalSourceManager } from "@features/inbox/hooks/useSignalSourceManager";
 import { useSlackChannels } from "@features/inbox/hooks/useSlackChannels";
+import { useSignalSourceManager } from "@features/inbox/hooks/useSignalSourceManager";
 import { useSlackConnect } from "@features/integrations/hooks/useSlackConnect";
 import { useIntegrationSelectors } from "@features/integrations/stores/integrationStore";
 import { ModalInlineComboboxContent } from "@features/settings/components/ModalInlineComboboxContent";

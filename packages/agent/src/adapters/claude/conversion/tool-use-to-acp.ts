@@ -380,6 +380,21 @@ export function toolInfoFromToolUse(
         content: [],
       };
 
+    case "ScheduleWakeUp": {
+      const datetime =
+        typeof input?.datetime === "string" ? input.datetime : null;
+      const message =
+        typeof input?.message === "string" ? input.message : null;
+      const label = datetime
+        ? `Schedule wake-up at ${datetime}`
+        : "Schedule wake-up";
+      return {
+        title: label,
+        kind: "think",
+        content: message ? toolContent().text(message).build() : [],
+      };
+    }
+
     case "ExitPlanMode":
       return {
         title: "Ready to code?",

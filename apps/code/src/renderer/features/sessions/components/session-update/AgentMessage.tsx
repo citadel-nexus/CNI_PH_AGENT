@@ -2,13 +2,16 @@ import { HighlightedCode } from "@components/HighlightedCode";
 import { Tooltip } from "@components/ui/Tooltip";
 import { usePendingScrollStore } from "@features/code-editor/stores/pendingScrollStore";
 import { MarkdownRenderer } from "@features/editor/components/MarkdownRenderer";
+import { useCloudPrUrl } from "@features/git-interaction/hooks/useCloudPrUrl";
 import { usePanelLayoutStore } from "@features/panels";
 import { useSessionTaskId } from "@features/sessions/hooks/useSessionTaskId";
 import { useCwd } from "@features/sidebar/hooks/useCwd";
 import type { FileItem } from "@hooks/useRepoFiles";
 import { useRepoFiles } from "@hooks/useRepoFiles";
+import { useIsWorkspaceCloudRun } from "@features/workspace/hooks/useWorkspace";
 import { Check, Copy } from "@phosphor-icons/react";
 import { Box, Code, IconButton } from "@radix-ui/themes";
+import { trpcClient } from "@renderer/trpc/client";
 import { memo, useCallback, useMemo, useState } from "react";
 import type { Components } from "react-markdown";
 
@@ -50,9 +53,16 @@ function InlineFileLink({
   const repoPath = useCwd(taskId ?? "");
   const openFileInSplit = usePanelLayoutStore((s) => s.openFileInSplit);
   const requestScroll = usePendingScrollStore((s) => s.requestScroll);
+  const isCloudRun = useIsWorkspaceCloudRun(taskId ?? undefined);
+  const prUrl = useCloudPrUrl(taskId ?? "");
 
   const handleClick = useCallback(() => {
     if (!taskId) return;
+    if (isCloudRun) {
+      const url = prUrl ? `${prUrl}/files` : null;
+      if (url) void trpcClient.os.openExternal.mutate({ url });
+      return;
+    }
     const relativePath =
       repoPath && filePath.startsWith(`${repoPath}/`)
         ? filePath.slice(repoPath.length + 1)
@@ -65,7 +75,7 @@ function InlineFileLink({
       if (line > 0) requestScroll(absolutePath, line);
     }
     openFileInSplit(taskId, relativePath, true);
-  }, [taskId, filePath, lineSuffix, repoPath, openFileInSplit, requestScroll]);
+  }, [taskId, filePath, lineSuffix, repoPath, openFileInSplit, requestScroll, isCloudRun, prUrl]);
 
   const tooltipText = resolvedPath ?? text;
 
