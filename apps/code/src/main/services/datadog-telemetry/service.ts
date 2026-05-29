@@ -42,6 +42,21 @@ export function trackInDatadog(
   properties?: Record<string, string | number | boolean>,
 ): void {
   _instance?.increment(`app.event.${eventName}`, properties);
+  _instance?.increment(`app.event.${eventName}`, toStringTags(properties));
+}
+
+function toStringTags(
+  tags?: TelemetryTags | Record<string, string | number | boolean>,
+): Record<string, string> | undefined {
+  if (!tags) {
+    return undefined;
+  }
+
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tags)) {
+    output[key] = String(value);
+  }
+  return output;
 }
 
 @injectable()
@@ -55,6 +70,9 @@ export class DatadogTelemetryService {
   private readonly recentEvents: TrackedDatadogEvent[] = [];
   private metricCalls = 0;
   private errorMetricCalls = 0;
+  private readonly activeSpanIds = new Set<string>();
+  private spanSequence = 0;
+  private lastEventAt: string | null = null;
 
   private agentStats = {
     sessionsStarted: 0,
@@ -184,6 +202,7 @@ export class DatadogTelemetryService {
     this.agentService.off(AgentServiceEvent.SessionEvent, this.onSessionEvent);
     this.updatesService.off(UpdatesEvent.Status, this.onUpdatesStatus);
     this.updatesService.off(UpdatesEvent.Ready, this.onUpdateReady);
+    this.activeSpanIds.clear();
 
     if (this.socket) {
       this.socket.close();
@@ -195,6 +214,40 @@ export class DatadogTelemetryService {
   }
 
   public getStats(): TelemetryStatsOutput {
+  startSpan(_name: string, _tags?: TelemetryTags): { spanId: string } {
+    const spanId = `${Date.now()}-${this.spanSequence++}`;
+    this.activeSpanIds.add(spanId);
+    return { spanId };
+  }
+
+  endSpan(span: { spanId: string } | string): void {
+    const spanId = typeof span === "string" ? span : span.spanId;
+    this.activeSpanIds.delete(spanId);
+  }
+
+  getDashboardStatus(): {
+    activeAlerts: number;
+    errorRate: number;
+    apmHealthy: boolean;
+    recentEventCount: number;
+    lastEventAt: string | null;
+  } {
+    const errorRate =
+      this.agentStats.sessionsStarted === 0
+        ? 0
+        : (this.agentStats.sessionErrors / this.agentStats.sessionsStarted) *
+          100;
+
+    return {
+      activeAlerts: this.agentStats.sessionErrors,
+      errorRate: Number(errorRate.toFixed(2)),
+      apmHealthy: this.agentStats.sessionErrors === 0,
+      recentEventCount: this.eventsEmitted,
+      lastEventAt: this.lastEventAt,
+    };
+  }
+
+  getStats(): TelemetryStatsOutput {
     return {
       agent: { ...this.agentStats },
       updates: { ...this.updateStats },
@@ -284,6 +337,44 @@ export class DatadogTelemetryService {
     this.send(message);
     this.eventsEmitted += 1;
     this.recordEvent(title);
+  incrementMetric(name: string, tags?: TelemetryTags): void {
+    this.increment(name, toStringTags(tags));
+  }
+
+  increment(name: string, tags?: Record<string, string>): void {
+    this.send(`${this.metricName(name)}:1|c${this.formatTags(tags)}`);
+  }
+
+  gauge(name: string, value: number, tags?: TelemetryTags): void {
+    this.send(
+      `${this.metricName(name)}:${value}|g${this.formatTags(toStringTags(tags))}`,
+    );
+  }
+
+  histogram(name: string, value: number, tags?: TelemetryTags): void {
+    this.send(
+      `${this.metricName(name)}:${value}|h${this.formatTags(toStringTags(tags))}`,
+    );
+  }
+
+  async trackEvent(
+    title: string,
+    text: string,
+    tags?: TelemetryTags,
+  ): Promise<void> {
+    const allTags = {
+      env: this.env,
+      service: this.serviceTag,
+      ...(toStringTags(tags) ?? {}),
+    };
+    const tagString = Object.entries(allTags)
+      .map(([key, value]) => `${key}:${value}`)
+      .join(",");
+
+    const msg = `_e{${title.length},${text.length}}:${title}|${text}|#${tagString}`;
+    this.send(msg);
+    this.eventsEmitted++;
+    this.lastEventAt = new Date().toISOString();
   }
 
   private setupSocket(): void {
@@ -439,6 +530,9 @@ export class DatadogTelemetryService {
         this.cbfStats.sessionFailures += 1;
       }
     }
+    const merged = { ...defaultTags, ...tags };
+    const tagList = Object.entries(merged).map(([key, value]) => `${key}:${value}`);
+    return tagList.length > 0 ? `|#${tagList.join(",")}` : "";
   }
 
   private send(payload: string): void {
@@ -455,6 +549,18 @@ export class DatadogTelemetryService {
     this.socket.send(buffer, STATSD_PORT, STATSD_HOST, (error) => {
       if (error) {
         log.warn("StatsD send error", { error: error.message });
+      return;
+    }
+
+    const buffer = Buffer.from(payload);
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      log.warn("StatsD payload too large, skipping", { size: buffer.length });
+      return;
+    }
+
+    this.socket.send(buffer, STATSD_PORT, STATSD_HOST, (err) => {
+      if (err) {
+        log.warn("StatsD send error", { error: err.message });
       }
     });
   }
