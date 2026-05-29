@@ -23,5 +23,22 @@
     "env": {
       "NOTION_TOKEN": "${NOTION_TOKEN}"
     }
+  },
+  "linear": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic-ai/mcp-linear"],
+    "env": {
+      "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+    }
+  },
+  "n8n": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@anthropic-ai/mcp-n8n"],
+    "env": {
+      "N8N_API_URL": "${N8N_API_URL}",
+      "N8N_API_KEY": "${N8N_API_KEY}"
+    }
   }
 }

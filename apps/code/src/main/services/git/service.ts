@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 import { execGh } from "@posthog/git/gh";
+import { configureGitOperationTelemetry } from "@posthog/git/operation-manager";
 import {
   getAllBranches,
   getBranchDiffPatchesByPath,
@@ -42,6 +43,7 @@ import { MAIN_TOKENS } from "../../di/tokens";
 import { logger } from "../../utils/logger";
 import { TypedEventEmitter } from "../../utils/typed-event-emitter";
 import type { AgentService } from "../agent/service";
+import type { DatadogTelemetryService } from "../datadog-telemetry/service";
 import type { LlmGatewayService } from "../llm-gateway/service";
 import type { SidebarPrState } from "../workspace/schemas";
 import type { WorkspaceService } from "../workspace/service";
@@ -141,8 +143,29 @@ export class GitService extends TypedEventEmitter<GitServiceEvents> {
     private readonly workspaceService: WorkspaceService,
     @inject(MAIN_TOKENS.AgentService)
     private readonly agentService: AgentService,
+    @inject(MAIN_TOKENS.DatadogTelemetryService)
+    private readonly datadogTelemetry: DatadogTelemetryService,
   ) {
     super();
+    const telemetry = this.datadogTelemetry as Partial<DatadogTelemetryService>;
+    configureGitOperationTelemetry({
+      startSpan: (name, tags) =>
+        telemetry.startSpan ? telemetry.startSpan(name, tags) : undefined,
+      endSpan: (span) => {
+        if (
+          typeof span === "object" &&
+          span !== null &&
+          "spanId" in span &&
+          typeof span.spanId === "string" &&
+          telemetry.endSpan
+        ) {
+          telemetry.endSpan(span.spanId);
+        }
+      },
+      incrementMetric: (name, tags) => telemetry.incrementMetric?.(name, tags),
+      histogram: (name, value, tags) =>
+        telemetry.histogram?.(name, value, tags),
+    });
   }
 
   /**
