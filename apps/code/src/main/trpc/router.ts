@@ -28,6 +28,7 @@ import { n8nIntegrationRouter } from "./routers/n8n-integration";
 import { notificationRouter } from "./routers/notification";
 import { oauthRouter } from "./routers/oauth";
 import { osRouter } from "./routers/os";
+import { pluginSyncRouter } from "./routers/plugin-sync";
 import { processTrackingRouter } from "./routers/process-tracking";
 import { provisioningRouter } from "./routers/provisioning";
 import { secureStoreRouter } from "./routers/secure-store";
@@ -73,6 +74,7 @@ export const trpcRouter = router({
   oauth: oauthRouter,
   logs: logsRouter,
   os: osRouter,
+  pluginSync: pluginSyncRouter,
   processTracking: processTrackingRouter,
   provisioning: provisioningRouter,
   sleep: sleepRouter,
